@@ -108,6 +108,36 @@ export {
   CredentialError,
 } from "./models/index.js";
 
+// ── Core: Agent ──────────────────────────────────────────────────────────────
+export { Agent } from "./core/agent/index.js";
+export { AgentBuilder } from "./core/agent/index.js";
+export { Runtime } from "./core/agent/index.js";
+export type { AgentParams, AgentConfig, RuntimeConfig } from "./core/agent/index.js";
+
+// ── Core: Tools ──────────────────────────────────────────────────────────────
+export { Tool, ToolRegistry, ToolExecutor } from "./core/tools/index.js";
+export type { ToolConfig, ToolExecuteFn } from "./core/tools/index.js";
+
+// ── Core: LLM ────────────────────────────────────────────────────────────────
+export { LLMClient } from "./core/llm/index.js";
+export type { ILLMClient, LLMClientConfig } from "./core/llm/index.js";
+export type { LLMProvider } from "./core/llm/index.js";
+export { parseModelString, OpenAIProvider, AnthropicProvider, GroqProvider, OllamaProvider } from "./core/llm/index.js";
+export { TieredRouter } from "./core/llm/index.js";
+export type { RouterConfig, TierConfig, DegradationStrategy } from "./core/llm/index.js";
+export { countStringTokens, countMessageTokens, clearTokenCache } from "./core/llm/index.js";
+
+// ── Core: Loops ──────────────────────────────────────────────────────────────
+export type { AgentLoop } from "./core/loops/index.js";
+export { ToolCallingLoop } from "./core/loops/index.js";
+
+// ── Core: State ──────────────────────────────────────────────────────────────
+export { AgentState } from "./core/state/index.js";
+export type { StateExtension, StateExtensionFactory } from "./core/state/index.js";
+
+// ── Core: Events ─────────────────────────────────────────────────────────────
+export { HookRegistry } from "./core/events/index.js";
+
 // ── Utilities ────────────────────────────────────────────────────────────────
 export {
   sleep,

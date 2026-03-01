@@ -482,10 +482,57 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
 ---
 
 <a id="phase-2"></a>
-## Phase 2: Core Agent & Runtime
+## Phase 2: Core Agent & Runtime ✅ COMPLETED
+
+> **Completed on**: 2026-03-01
+>
+> **What was implemented**:
+>
+> **Core Agent (`core/agent/agent.ts`)**:
+> - `Agent` class — top-level user-facing API
+> - Static `Agent.builder()` → `AgentBuilder` (fluent construction)
+> - `run(input, options?)` / `arun(input, options?)` → `Promise<AgentRunResult>`
+> - `astream(input, options?)` → `AsyncIterableIterator<StreamEvent>` (streaming)
+> - `close()` → graceful shutdown + `Symbol.asyncDispose` support
+> - Properties: `agentId`, `agentName`, `model`, `tools`, `toolRegistry`, `hookRegistry`, `metadata`, `closed`
+> - Guards: throws if agent is closed
+>
+> **Agent Builder (`core/agent/builder.ts`)**:
+> - Fluent API with full method chaining: `.model()`, `.systemPrompt()` (string or `() => string`), `.tools()`, `.tool()`, `.llmClient()`, `.loop()`, `.hook()`, `.maxIterations()`, `.timeout()`, `.agentId()`, `.agentName()`, `.onEvent()`, `.metadata()`
+> - Wires all components: ToolRegistry, HookRegistry, ToolExecutor, ToolCallingLoop, Runtime
+> - Validates required deps (LLM client)
+> - Builder methods for middleware, memory, permissions, skills, subagents, MCP will be added in their respective phases
+>
+> **Runtime (`core/agent/runtime.ts`)**:
+> - `createState(input, options?)` — builds AgentState with system prompt + user message + tool schemas
+> - `runWithState(state)` — executes agent loop to completion, returns `AgentRunResult`
+> - `streamWithState(state)` — async generator yielding `StreamEvent`s (iteration_start/end, text_delta, tool_call_start/end, done, error)
+> - Hook emission: `agent.run.before`, `agent.run.after`, `agent.run.error`
+> - Timeout management (marks state as completed on deadline)
+> - Max iteration enforcement
+> - Supports dynamic system prompts (lazy function evaluation)
+>
+> **Also implemented as prerequisites (early pull-forward from later phases)**:
+>
+> - **Tool System (`core/tools/`)**: `Tool` class, `ToolConfig`, `ToolRegistry` (register/get/has/getAll/getSchemas/iterator), `ToolExecutor` (execute with timeout+retry, parallel execution)
+> - **Agent Loop (`core/loops/`)**: `AgentLoop` interface, `ToolCallingLoop` (standard think→act→observe pattern with parallel tool execution, hook emission for iteration/LLM/tool lifecycle, cancellation via hooks)
+> - **State (`core/state/state.ts`)**: `AgentState` with messages, toolSchemas, iteration tracking, TokenUsage accumulation, metrics, toolCallRecords, extensions (typed), metadata (Map), checkpoint serialization/deserialization, AbortSignal support
+> - **Hooks (`core/events/hooks.ts`)**: `HookRegistry` with priority-ordered handlers, async emit, cancel/modify via `HookContext`, on/off/clear
+> - **LLM Interface (`core/llm/client.ts`)**: `ILLMClient` interface (call + stream)
+>
+> **Tests**: 45 new tests (93 total across 4 files — all passing)
+> - Tool: execute, schema, registry (register, get, duplicate, getOrThrow, schemas, iterable)
+> - ToolExecutor: execute, missing tool, error handling, parallel execution
+> - HookRegistry: register, emit, priority order, cancel, remove, hasHandlers
+> - AgentState: defaults, messages, usage accumulation, extensions, checkpoint round-trip, abort signal
+> - ToolCallingLoop: text-only response, tool call + continue, shouldContinue, hook firing (10 hooks in correct order), hook cancellation of tool calls
+> - Runtime: createState (system prompt + user msg), dynamic system prompt, run to completion, run with tools, lifecycle hooks, error hook, streaming, max iterations
+> - Agent (builder integration): construction, simple conversation, tool-using conversation, streaming, hooks via builder, close guard, tools exposure, builder validation, metadata
+>
+> **Build**: ESM + CJS + DTS output. Index grew to ~28KB ESM, ~34KB types.
 
 ### 2.1 Agent Class
-- [ ] `core/agent/agent.ts`:
+- [x] `core/agent/agent.ts`:
   - Constructor accepting all components
   - Static `builder()` method returning `AgentBuilder`
   - `run(input: string): Promise<AgentRunResult>` (sync wrapper)
@@ -496,7 +543,7 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
   - Properties: `agentId`, `agentName`, `runtime`, `tools`, `model`
 
 ### 2.2 Agent Builder
-- [ ] `core/agent/builder.ts`:
+- [x] `core/agent/builder.ts`:
   - Fluent API with method chaining
   - Type-safe builder (generic accumulation pattern)
   - Methods:
@@ -504,92 +551,81 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
     - `.systemPrompt(prompt: string | (() => string))`
     - `.tools(tools: Tool[])`
     - `.tool(tool: Tool)`
-    - `.middleware(middleware: Middleware[])`
-    - `.memoryManager(manager: MemoryManager)`
-    - `.stateStore(store: StateStore)`
-    - `.sessionManager(manager: SessionManager)`
-    - `.permissions(policy: PermissionPolicy)`
-    - `.humanInput(handler: HumanInputHandler)`
+    - `.middleware(middleware: Middleware[])` — placeholder, wired in Phase 8
+    - `.memoryManager(manager: MemoryManager)` — placeholder, wired in Phase 9
+    - `.stateStore(store: StateStore)` — placeholder, wired in Phase 6
+    - `.sessionManager(manager: SessionManager)` — placeholder, wired in Phase 6
+    - `.permissions(policy: PermissionPolicy)` — placeholder, wired in Phase 11
+    - `.humanInput(handler: HumanInputHandler)` — placeholder, wired in Phase 11
     - `.hook(event: string, handler: HookHandler, priority?: number)`
-    - `.skill(skill: Skill)`
-    - `.subagent(name: string, config: SubagentConfig)`
-    - `.mcpServer(name: string, config: MCPServerConfig)`
-    - `.plugin(plugin: Plugin)`
-    - `.contextManager(manager: ContextManager)`
+    - `.skill(skill: Skill)` — placeholder, wired in Phase 12
+    - `.subagent(name: string, config: SubagentConfig)` — placeholder, wired in Phase 12
+    - `.mcpServer(name: string, config: MCPServerConfig)` — placeholder, wired in Phase 13
+    - `.plugin(plugin: Plugin)` — placeholder, wired in Phase 12
+    - `.contextManager(manager: ContextManager)` — placeholder, wired in Phase 10
     - `.onEvent(handler: (event: AgentEvent) => void)`
     - `.maxIterations(n: number)`
     - `.timeout(ms: number)`
     - `.build(): Agent`
 
 ### 2.3 Runtime
-- [ ] `core/agent/runtime.ts`:
+- [x] `core/agent/runtime.ts`:
   - `createState(input: string): AgentState`
   - `runWithState(state: AgentState): Promise<AgentRunResult>`
   - `streamWithState(state: AgentState): AsyncIterableIterator<StreamEvent>`
   - Hook emission (agent.run.before/after/error)
-  - Memory injection/saving
-  - State persistence
+  - Memory injection/saving — wired in Phase 9
+  - State persistence — wired in Phase 6
   - Timeout management via `AbortController`
 
 ---
 
 <a id="phase-3"></a>
-## Phase 3: LLM Client & Providers
+## Phase 3: LLM Client & Providers ✅ COMPLETED
+
+> **Completed**: Phase 3 implemented all LLM provider abstractions, 4 provider implementations,
+> tiered routing, token counting, and the full LLMClient with retry/dedup/usage tracking.
+>
+> **Files created/updated**:
+> - `src/core/llm/providers/base.ts` — `LLMProvider` interface + `parseModelString()` utility
+> - `src/core/llm/providers/openai.ts` — OpenAI provider (GPT-4o, o1, o3) with lazy SDK loading, streaming with tool call assembly across chunks
+> - `src/core/llm/providers/anthropic.ts` — Anthropic provider (Claude Opus/Sonnet/Haiku) with extended thinking, prompt caching usage tracking
+> - `src/core/llm/providers/groq.ts` — Groq provider delegating to OpenAI-compatible API
+> - `src/core/llm/providers/ollama.ts` — Ollama provider via native `fetch()`, NDJSON streaming, no SDK dependency
+> - `src/core/llm/providers/index.ts` — Barrel exports
+> - `src/core/llm/router.ts` — `TieredRouter` with 3-tier model selection, env var auto-discovery, degradation strategies
+> - `src/core/llm/token-counter.ts` — `countStringTokens()`, `countMessageTokens()` with gpt-tokenizer for OpenAI, char-based fallback, LRU cache
+> - `src/core/llm/client.ts` — Full `LLMClient` with provider management, auto-discovery from env vars, dedup cache, retry on rate limit/5xx, usage tracking
+> - `src/core/llm/index.ts` — Full exports for all Phase 3 types
+> - `src/index.ts` — Updated with Phase 3 exports
+> - `tests/unit/llm.test.ts` — 36 tests (parseModelString, TieredRouter, TokenCounter, LLMClient, OllamaProvider, GroqProvider)
+>
+> **Test results**: 129 tests passing (36 new), build successful (ESM+CJS+DTS).
+>
+> **Key design decisions**:
+> - Providers are lazy-loaded (SDK `import()` only when first used) to avoid requiring all provider SDKs
+> - `Record<string, unknown>` params cast via `unknown` for SDK compatibility without coupling to SDK internals
+> - Groq reuses OpenAI provider with custom baseUrl (100% OpenAI-compatible API)
+> - Ollama uses raw `fetch()` — no SDK needed, works with any locally-pulled model
+> - Auto-discovery checks env vars (OPENAI_API_KEY, ANTHROPIC_API_KEY, GROQ_API_KEY, OLLAMA_HOST)
 
 ### 3.1 Provider Interface
-- [ ] `core/llm/providers/base.ts`:
-  ```typescript
-  interface LLMProvider {
-    name: string;
-    supportedModels: string[];
-    call(request: LLMRequest, config: ProviderConfig): Promise<LLMResponse>;
-    stream(request: LLMRequest, config: ProviderConfig): AsyncIterableIterator<LLMStreamChunk>;
-    supportsModel(model: string): boolean;
-  }
-
-  interface ProviderConfig {
-    apiKey?: string;
-    baseUrl?: string;
-    timeout?: number;
-    headers?: Record<string, string>;
-  }
-  ```
+- [x] `core/llm/providers/base.ts` — `LLMProvider` interface + `parseModelString()`
 
 ### 3.2 Provider Implementations
-- [ ] `providers/openai.ts` — OpenAI provider (using `openai` npm package)
-  - Models: gpt-4o, gpt-4o-mini, gpt-4-turbo, o1, o3
-  - Tool calling, streaming, vision, response_format
-- [ ] `providers/anthropic.ts` — Anthropic provider (using `@anthropic-ai/sdk`)
-  - Models: claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5
-  - Tool use, streaming, prompt caching, extended thinking
-- [ ] `providers/groq.ts` — Groq provider (OpenAI-compatible)
-  - Models: llama-3.1-8b-instant, llama-3.1-70b-versatile
-- [ ] `providers/ollama.ts` — Ollama provider (HTTP API)
-  - Local models: llama, mistral, codellama, etc.
+- [x] `providers/openai.ts` — OpenAI provider (gpt-4o, gpt-4o-mini, gpt-4-turbo, o1, o3)
+- [x] `providers/anthropic.ts` — Anthropic provider (claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5)
+- [x] `providers/groq.ts` — Groq provider (OpenAI-compatible)
+- [x] `providers/ollama.ts` — Ollama provider (HTTP API, native fetch)
 
 ### 3.3 LLM Client
-- [ ] `core/llm/client.ts`:
-  - Provider registration and management
-  - `call(request: LLMRequest): Promise<LLMResponse>`
-  - `stream(request: LLMRequest): AsyncIterableIterator<LLMStreamChunk>`
-  - Request deduplication (hash-based caching)
-  - Usage tracking
-  - Automatic retry with exponential backoff
-  - `AbortSignal` support
+- [x] `core/llm/client.ts` — Full implementation with provider management, dedup, retry, usage tracking
 
 ### 3.4 Tiered Router
-- [ ] `core/llm/router.ts`:
-  - Three-tier model selection
-  - Auto-discovery from environment variables
-  - Degradation strategies: FallbackToLowerTier, ResetAndRetry, RaiseError
-  - Configurable tier assignments
+- [x] `core/llm/router.ts` — 3-tier routing with degradation strategies
 
 ### 3.5 Token Counter
-- [ ] `core/llm/token-counter.ts`:
-  - Use `gpt-tokenizer` or `tiktoken` for OpenAI models
-  - Anthropic token estimation
-  - Caching for performance
-  - `countTokens(messages, model, tools): number`
+- [x] `core/llm/token-counter.ts` — gpt-tokenizer + char estimation + cache
 
 ---
 
