@@ -172,7 +172,8 @@ export type { Session, SessionStore } from "./core/state/index.js";
 export { touchSession, InMemorySessionStore, FileSessionStore, SessionManager } from "./core/state/index.js";
 
 // ── Core: Events ─────────────────────────────────────────────────────────────
-export { HookRegistry } from "./core/events/index.js";
+export { HookRegistry, EventFilter, InMemoryEventBus } from "./core/events/index.js";
+export type { EventBus, DeadLetterEntry, InMemoryEventBusOptions } from "./core/events/index.js";
 
 // ── Utilities ────────────────────────────────────────────────────────────────
 export {

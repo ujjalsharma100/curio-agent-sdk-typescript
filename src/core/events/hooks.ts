@@ -72,6 +72,12 @@ export class HookRegistry {
     return [...this.hooks.keys()];
   }
 
+  /** List handlers registered for an event (in priority order). */
+  listHandlers(event: string): HookHandler[] {
+    const list = this.hooks.get(event);
+    return list ? list.map((h) => h.handler) : [];
+  }
+
   /** Remove all handlers. */
   clear(): void {
     this.hooks.clear();

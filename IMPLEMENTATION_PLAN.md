@@ -772,52 +772,24 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
 ---
 
 <a id="phase-7"></a>
-## Phase 7: Hooks & Events
+## Phase 7: Hooks & Events ✅ COMPLETED
+
+> **Completed**: Phase 7 implements the hook system and event bus. HookContext (in `models/events.ts`) now supports optional `state`, and `isCancelled()` in addition to the `cancelled` getter. HookRegistry (`core/events/hooks.ts`) provides `on`, `off`, `emit`, `listHandlers`, priority-based execution, and async handler support. Event bus (`core/events/event-bus.ts`) provides EventBus interface, EventFilter (glob pattern matching), InMemoryEventBus (Component lifecycle, publish, subscribe returning Unsubscribe, replay from Date, dead letter queue), and DeadLetterEntry type. All exported from `core/events/index.ts` and main `index.ts`. Tests in `tests/unit/events.test.ts` (22 tests).
 
 ### 7.1 Hook System
-- [ ] `core/events/hooks.ts`:
-  ```typescript
-  type HookHandler = (ctx: HookContext) => void | Promise<void>;
-
-  class HookContext {
-    event: string;
-    data: Record<string, unknown>;
-    state?: AgentState;
-    runId?: string;
-    agentId?: string;
-    iteration?: number;
-
-    cancel(): void;
-    modify(key: string, value: unknown): void;
-    isCancelled(): boolean;
-  }
-
-  class HookRegistry {
-    on(event: string, handler: HookHandler, priority?: number): void;
-    off(event: string, handler: HookHandler): void;
-    emit(event: string, context: HookContext): Promise<void>;
-    listHandlers(event: string): HookHandler[];
-  }
-  ```
-  - 16 built-in events matching Python SDK
-  - Priority-based execution order
-  - Async handler support
-  - Mutable context (cancel, modify)
+- [x] `core/events/hooks.ts`:
+  - HookHandler type and HookRegistry with `on`, `off`, `emit`, `listHandlers`, `hasHandlers`, `handlerCount`, `getRegisteredEvents`, `clear`
+  - Priority-based execution order (lower number = earlier)
+  - Async handler support; emit stops after cancel
+- [x] HookContext in `models/events.ts`: `event`, `data`, optional `state`, `runId`, `agentId`, `iteration`, `cancel()`, `modify()`, `isCancelled()`, `cancelled` getter
+- [x] 16 built-in events via `HookEvent` constant object
 
 ### 7.2 Event Bus
-- [ ] `core/events/event-bus.ts`:
-  ```typescript
-  interface EventBus {
-    subscribe(pattern: string, handler: (event: AgentEvent) => void): () => void;
-    publish(event: AgentEvent): Promise<void>;
-    replay(startTime: Date, pattern?: string): AsyncIterableIterator<AgentEvent>;
-  }
-
-  class InMemoryEventBus implements EventBus { ... }
-  ```
-  - Glob pattern matching for subscriptions
-  - Replay capability
-  - Dead letter queue
+- [x] `core/events/event-bus.ts`:
+  - `EventBus` interface: `subscribe(pattern, handler) => Unsubscribe`, `publish(event)`, `replay(startTime, pattern?) => AsyncIterableIterator<AgentEvent>`, `deadLetters`
+  - `EventFilter`: glob pattern matching (`*`, `?`, dotted names)
+  - `InMemoryEventBus` extends Component: startup/shutdown, bounded history, dead letter queue, `clearDeadLetters()`, `clearHistory()`
+  - EventType → hook-style name mapping for pattern matching
 
 ---
 

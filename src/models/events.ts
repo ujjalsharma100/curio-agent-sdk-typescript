@@ -49,6 +49,8 @@ export type HookEventName = (typeof HookEvent)[keyof typeof HookEvent];
 export class HookContext {
   readonly event: string;
   readonly data: Record<string, unknown>;
+  /** Optional agent state (e.g. AgentState) when available in the hook chain. */
+  readonly state?: unknown;
   readonly runId?: string;
   readonly agentId?: string;
   readonly iteration?: number;
@@ -57,12 +59,14 @@ export class HookContext {
   constructor(params: {
     event: string;
     data: Record<string, unknown>;
+    state?: unknown;
     runId?: string;
     agentId?: string;
     iteration?: number;
   }) {
     this.event = params.event;
     this.data = { ...params.data };
+    this.state = params.state;
     this.runId = params.runId;
     this.agentId = params.agentId;
     this.iteration = params.iteration;
@@ -74,6 +78,11 @@ export class HookContext {
   }
 
   /** Whether cancel() has been called. */
+  isCancelled(): boolean {
+    return this._cancelled;
+  }
+
+  /** Whether cancel() has been called (getter alias). */
   get cancelled(): boolean {
     return this._cancelled;
   }
