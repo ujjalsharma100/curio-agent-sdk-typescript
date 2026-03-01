@@ -80,8 +80,12 @@ describe("HookRegistry", () => {
   it("should run handlers in priority order (lower first)", async () => {
     const reg = new HookRegistry();
     const order: string[] = [];
-    reg.on(HookEvent.TOOL_CALL_BEFORE, () => order.push("low"), 10);
-    reg.on(HookEvent.TOOL_CALL_BEFORE, () => order.push("high"), 0);
+    reg.on(HookEvent.TOOL_CALL_BEFORE, () => {
+      order.push("low");
+    }, 10);
+    reg.on(HookEvent.TOOL_CALL_BEFORE, () => {
+      order.push("high");
+    }, 0);
     const ctx = new HookContext({
       event: HookEvent.TOOL_CALL_BEFORE,
       data: {},
@@ -97,7 +101,9 @@ describe("HookRegistry", () => {
       order.push("first");
       ctx.cancel();
     });
-    reg.on(HookEvent.LLM_CALL_BEFORE, () => order.push("second"));
+    reg.on(HookEvent.LLM_CALL_BEFORE, () => {
+      order.push("second");
+    });
     const ctx = new HookContext({
       event: HookEvent.LLM_CALL_BEFORE,
       data: {},
@@ -110,7 +116,9 @@ describe("HookRegistry", () => {
   it("should remove handler with off", async () => {
     const reg = new HookRegistry();
     const seen: number[] = [];
-    const handler = () => seen.push(1);
+    const handler = () => {
+      seen.push(1);
+    };
     reg.on(HookEvent.AGENT_RUN_BEFORE, handler);
     await reg.emit(
       HookEvent.AGENT_RUN_BEFORE,
@@ -213,7 +221,9 @@ describe("InMemoryEventBus", () => {
     const bus = new InMemoryEventBus({ maxHistory: 100 });
     await bus.startup();
     const received: AgentEvent[] = [];
-    const handler = (ev: AgentEvent) => received.push(ev);
+    const handler = (ev: AgentEvent) => {
+      received.push(ev);
+    };
     bus.subscribe("*", handler);
     const event = makeEvent(EventType.RUN_STARTED);
     await bus.publish(event);
@@ -227,8 +237,12 @@ describe("InMemoryEventBus", () => {
     await bus.startup();
     const agentEvents: EventType[] = [];
     const llmEvents: EventType[] = [];
-    bus.subscribe("agent.*", (ev) => agentEvents.push(ev.type));
-    bus.subscribe("llm.call.*", (ev) => llmEvents.push(ev.type));
+    bus.subscribe("agent.*", (ev) => {
+      agentEvents.push(ev.type);
+    });
+    bus.subscribe("llm.call.*", (ev) => {
+      llmEvents.push(ev.type);
+    });
     await bus.publish(makeEvent(EventType.RUN_STARTED));
     await bus.publish(makeEvent(EventType.LLM_CALL_COMPLETED));
     await bus.publish(makeEvent(EventType.TOOL_CALL_STARTED));
@@ -243,7 +257,9 @@ describe("InMemoryEventBus", () => {
     const bus = new InMemoryEventBus();
     await bus.startup();
     let count = 0;
-    const handler = () => count++;
+    const handler = () => {
+      count++;
+    };
     const unsub = bus.subscribe("*", handler);
     await bus.publish(makeEvent(EventType.RUN_STARTED));
     expect(count).toBe(1);
@@ -322,7 +338,7 @@ describe("InMemoryEventBus", () => {
     const bus = new InMemoryEventBus();
     await bus.startup();
     const payload: EventType[] = [];
-    const asyncHandler = async (ev: { type: EventType }) => {
+    const asyncHandler = async (ev: { type: EventType }): Promise<void> => {
       payload.push(ev.type);
     };
     bus.subscribe("*", asyncHandler);
