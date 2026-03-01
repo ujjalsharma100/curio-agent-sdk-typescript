@@ -90,7 +90,7 @@ export function addTokenUsage(a: TokenUsage, b: TokenUsage): TokenUsage {
 // ---------------------------------------------------------------------------
 
 /** The reason the LLM stopped generating. */
-export type FinishReason = "stop" | "tool_calls" | "length" | "content_filter";
+export type FinishReason = "stop" | "tool_calls" | "length" | "content_filter" | "error";
 
 /** Format for structured/JSON responses. */
 export interface ResponseFormat {

@@ -83,6 +83,7 @@ export class ToolCallingLoop implements AgentLoop {
       ...(this.maxTokens !== undefined && { maxTokens: this.maxTokens }),
       ...(this.temperature !== undefined && { temperature: this.temperature }),
       ...(state.toolSchemas.length === 0 && this.responseFormat && { responseFormat: this.responseFormat }),
+      metadata: { runId: state.runId, agentId: state.agentId },
     };
 
     // Emit llm.call.before hook
@@ -262,6 +263,7 @@ export class ToolCallingLoop implements AgentLoop {
       ...(this.maxTokens !== undefined && { maxTokens: this.maxTokens }),
       ...(this.temperature !== undefined && { temperature: this.temperature }),
       ...(state.toolSchemas.length === 0 && this.responseFormat && { responseFormat: this.responseFormat }),
+      metadata: { runId: state.runId, agentId: state.agentId },
     };
 
     const llmBeforeCtx = new HookContext({

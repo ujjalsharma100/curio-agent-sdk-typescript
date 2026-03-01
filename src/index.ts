@@ -175,6 +175,17 @@ export { touchSession, InMemorySessionStore, FileSessionStore, SessionManager } 
 export { HookRegistry, EventFilter, InMemoryEventBus } from "./core/events/index.js";
 export type { EventBus, DeadLetterEntry, InMemoryEventBusOptions } from "./core/events/index.js";
 
+// ── Middleware (also available as curio-agent-sdk/middleware) ──────────────────
+export type { Middleware } from "./middleware/base.js";
+export { MiddlewarePipeline } from "./middleware/base.js";
+export { LoggingMiddleware, CostTracker, RateLimitMiddleware, TracingMiddleware } from "./middleware/index.js";
+export { GuardrailsMiddleware, GuardrailsError } from "./middleware/index.js";
+export { PrometheusExporter, TracingConsumer, LoggingConsumer, PersistenceConsumer, getTraceContext } from "./middleware/index.js";
+export type { LoggingMiddlewareOptions, CostTrackerOptions, RateLimitMiddlewareOptions } from "./middleware/index.js";
+export type { TracingMiddlewareOptions, GuardrailsMiddlewareOptions, PrometheusExporterOptions } from "./middleware/index.js";
+export type { TracingConsumerOptions, LoggingConsumerOptions } from "./middleware/index.js";
+export { DEFAULT_PRICING } from "./middleware/index.js";
+
 // ── Utilities ────────────────────────────────────────────────────────────────
 export {
   sleep,

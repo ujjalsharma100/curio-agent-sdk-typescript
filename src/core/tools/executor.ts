@@ -7,6 +7,7 @@ import { withTimeout, withRetry } from "../../utils/async.js";
 import { sha256 } from "../../utils/hash.js";
 import { HookContext, HookEvent } from "../../models/events.js";
 import type { HookRegistry } from "../events/hooks.js";
+import type { MiddlewarePipeline } from "../../middleware/base.js";
 import { ToolRegistry } from "./registry.js";
 import type { Tool } from "./tool.js";
 
@@ -83,6 +84,8 @@ function cacheKey(toolName: string, args: Record<string, unknown>): string {
 export interface ToolExecutorOptions {
   /** Optional hook registry for tool.call.before/after/error. */
   hookRegistry?: HookRegistry;
+  /** Optional middleware pipeline for tool.call before/after. */
+  middlewarePipeline?: MiddlewarePipeline;
   /** Optional permission policy; when set, check before executing. */
   permissionPolicy?: PermissionPolicy;
 }
@@ -106,11 +109,18 @@ export class ToolExecutor {
    * When options.permissionPolicy is set, checks permission before executing.
    */
   async executeTool(call: ToolCall, context?: ToolExecutorContext): Promise<ToolResult> {
-    const { hookRegistry, permissionPolicy } = this.options;
-    const toolName = call.name;
+    const { hookRegistry, permissionPolicy, middlewarePipeline } = this.options;
+    let toolName = call.name;
     let args = { ...call.arguments };
     const runId = context?.runId ?? "";
     const agentId = context?.agentId ?? "";
+
+    // Middleware beforeToolCall (can modify tool name and args)
+    if (middlewarePipeline) {
+      const out = await middlewarePipeline.runBeforeToolCall(toolName, args);
+      toolName = out.toolName;
+      args = out.args;
+    }
 
     const tool = this.registry.get(toolName);
     if (!tool) {
@@ -192,10 +202,14 @@ export class ToolExecutor {
       const key = cacheKey(toolName, args);
       const entry = this._cache.get(key);
       if (entry && Date.now() < entry.expiresAt) {
+        let result = entry.result;
+        if (middlewarePipeline) {
+          result = await middlewarePipeline.runAfterToolCall(toolName, args, result);
+        }
         const cachedResult: ToolResult = {
           toolCallId: call.id,
           toolName: toolName,
-          result: entry.result,
+          result,
           duration: 0,
         };
         if (hookRegistry) {
@@ -203,7 +217,7 @@ export class ToolExecutor {
             HookEvent.TOOL_CALL_AFTER,
             new HookContext({
               event: HookEvent.TOOL_CALL_AFTER,
-              data: { toolName, args, result: entry.result },
+              data: { toolName, args, result },
               runId,
               agentId,
             }),
@@ -218,10 +232,14 @@ export class ToolExecutor {
       const key = cacheKey(toolName, args);
       const prev = this._idempotencyStore.get(key);
       if (prev) {
+        let result = prev.result;
+        if (middlewarePipeline) {
+          result = await middlewarePipeline.runAfterToolCall(toolName, args, result);
+        }
         const replayResult: ToolResult = {
           toolCallId: call.id,
           toolName: toolName,
-          result: prev.result,
+          result,
           error: prev.error,
           duration: 0,
         };
@@ -230,7 +248,7 @@ export class ToolExecutor {
             HookEvent.TOOL_CALL_AFTER,
             new HookContext({
               event: HookEvent.TOOL_CALL_AFTER,
-              data: { toolName, args, result: prev.result },
+              data: { toolName, args, result },
               runId,
               agentId,
             }),
@@ -255,17 +273,22 @@ export class ToolExecutor {
         this._idempotencyStore.set(key, { result });
       }
 
+      let resultToReturn = result;
+      if (middlewarePipeline) {
+        resultToReturn = await middlewarePipeline.runAfterToolCall(toolName, args, result);
+      }
+
       const toolResult: ToolResult = {
         toolCallId: call.id,
         toolName: toolName,
-        result,
+        result: resultToReturn,
         duration: Date.now() - start,
       };
 
       if (hookRegistry) {
         const afterCtx = new HookContext({
           event: HookEvent.TOOL_CALL_AFTER,
-          data: { toolName, args, result, duration: toolResult.duration, toolCallId: call.id },
+          data: { toolName, args, result: resultToReturn, duration: toolResult.duration, toolCallId: call.id },
           runId,
           agentId,
         });

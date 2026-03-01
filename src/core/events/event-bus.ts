@@ -32,11 +32,9 @@ const log = createLogger("event-bus");
  * - "*.error"        — matches agent.run.error, llm.call.error, tool.call.error
  */
 export class EventFilter {
-  private readonly pattern: string;
   private readonly re: RegExp;
 
   constructor(pattern: string) {
-    this.pattern = pattern;
     this.re = globToRegExp(pattern);
   }
 

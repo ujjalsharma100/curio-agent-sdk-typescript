@@ -17,10 +17,12 @@ import type { ILLMClient } from "../llm/client.js";
 import type { AgentLoop } from "../loops/base.js";
 import type { StateStore } from "../state/state-store.js";
 import type { SessionManager } from "../state/session.js";
+import type { Middleware } from "../../middleware/base.js";
 import { Tool } from "../tools/tool.js";
 import { ToolRegistry } from "../tools/registry.js";
 import { ToolExecutor } from "../tools/executor.js";
 import { HookRegistry } from "../events/hooks.js";
+import { MiddlewarePipeline } from "../../middleware/base.js";
 import { ToolCallingLoop } from "../loops/tool-calling.js";
 import { Runtime } from "./runtime.js";
 import { generateShortId } from "../../utils/hash.js";
@@ -35,6 +37,7 @@ export interface AgentConfig {
   llmClient?: ILLMClient;
   loop?: AgentLoop;
   hooks: Array<{ event: string; handler: HookHandler; priority?: number }>;
+  middleware: Middleware[];
   maxIterations: number;
   timeout: number;
   agentId: string;
@@ -51,6 +54,7 @@ export class AgentBuilder {
     systemPrompt: "",
     tools: [],
     hooks: [],
+    middleware: [],
     maxIterations: 50,
     timeout: 0,
     agentId: generateShortId(),
@@ -136,6 +140,18 @@ export class AgentBuilder {
     return this;
   }
 
+  /** Set the middleware pipeline (replaces any previously set middleware). */
+  middleware(middleware: Middleware[]): this {
+    this.config.middleware = [...middleware];
+    return this;
+  }
+
+  /** Add a single middleware to the pipeline. */
+  addMiddleware(mw: Middleware): this {
+    this.config.middleware.push(mw);
+    return this;
+  }
+
   /** Set the state store for run persistence (save/load/resume). */
   stateStore(store: StateStore): this {
     this.config.stateStore = store;
@@ -162,17 +178,24 @@ export class AgentBuilder {
       hookRegistry.on(event, handler, priority);
     }
 
-    // Build tool executor (with hook registry so executor emits tool.call.* hooks)
-    const toolExecutor = new ToolExecutor(toolRegistry, { hookRegistry });
-
-    // Build loop (default: ToolCallingLoop)
-    const llmClient = this.config.llmClient;
+    // Build middleware pipeline and wrap LLM client
+    const pipeline = new MiddlewarePipeline(this.config.middleware, { hookRegistry });
+    let llmClient = this.config.llmClient;
     if (!llmClient) {
       throw new Error(
         "An LLM client is required. Call .llmClient(client) on the builder. " +
           "Full provider auto-detection will be available in Phase 3.",
       );
     }
+    if (this.config.middleware.length > 0) {
+      llmClient = pipeline.wrapLLMClient(llmClient);
+    }
+
+    // Build tool executor (with hook registry and optional pipeline for tool middleware)
+    const toolExecutor = new ToolExecutor(toolRegistry, {
+      hookRegistry,
+      middlewarePipeline: this.config.middleware.length > 0 ? pipeline : undefined,
+    });
 
     const loop = this.config.loop ?? new ToolCallingLoop(llmClient, toolExecutor, hookRegistry);
 

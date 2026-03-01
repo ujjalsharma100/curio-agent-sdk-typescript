@@ -794,37 +794,43 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
 ---
 
 <a id="phase-8"></a>
-## Phase 8: Middleware Pipeline
+## Phase 8: Middleware Pipeline ✅ COMPLETED
+
+> **Completed**: Middleware interface, pipeline with hook emission, wrapLLMClient, built-in middleware (logging, cost-tracker, rate-limit, tracing, guardrails, prometheus, consumers). Builder `.middleware()` / `.addMiddleware()`, executor runs pipeline for tool before/after. Loop request metadata includes runId/agentId for pipeline. Tests in `tests/unit/middleware.test.ts`.
 
 ### 8.1 Middleware Interface
-- [ ] `middleware/base.ts`:
+- [x] `middleware/base.ts`:
   ```typescript
   interface Middleware {
     name: string;
     beforeLLMCall?(request: LLMRequest): Promise<LLMRequest | void>;
     afterLLMCall?(request: LLMRequest, response: LLMResponse): Promise<LLMResponse | void>;
     onLLMStreamChunk?(request: LLMRequest, chunk: LLMStreamChunk): Promise<LLMStreamChunk | void>;
-    beforeToolCall?(toolName: string, args: Record<string, unknown>): Promise<Record<string, unknown> | void>;
+    beforeToolCall?(toolName: string, args: Record<string, unknown>): Promise<{ toolName: string; args: Record<string, unknown> } | void>;
     afterToolCall?(toolName: string, args: Record<string, unknown>, result: string): Promise<string | void>;
     onError?(error: Error, context: Record<string, unknown>): Promise<Error | null>;
   }
 
   class MiddlewarePipeline {
     add(middleware: Middleware): void;
-    runBeforeLLMCall(request: LLMRequest): Promise<LLMRequest>;
-    runAfterLLMCall(request: LLMRequest, response: LLMResponse): Promise<LLMResponse>;
-    // ... etc.
+    runBeforeLLMCall(request: LLMRequest, runId?, agentId?): Promise<LLMRequest>;
+    runAfterLLMCall(request: LLMRequest, response: LLMResponse, runId?, agentId?): Promise<LLMResponse>;
+    runOnLLMStreamChunk(...): Promise<LLMStreamChunk | undefined>;
+    runBeforeToolCall(toolName, args): Promise<{ toolName; args }>;
+    runAfterToolCall(toolName, args, result): Promise<string>;
+    runOnError(error, context, runId?, agentId?): Promise<Error | null>;
+    wrapLLMClient(inner): T;
   }
   ```
 
 ### 8.2 Built-in Middleware
-- [ ] `middleware/logging.ts` — Structured logging (pino-compatible)
-- [ ] `middleware/cost-tracker.ts` — Budget enforcement, per-model breakdown
-- [ ] `middleware/rate-limit.ts` — Token bucket rate limiting
-- [ ] `middleware/tracing.ts` — OpenTelemetry spans
-- [ ] `middleware/guardrails.ts` — Content safety, PII detection, injection blocking
-- [ ] `middleware/prometheus.ts` — Prometheus metrics export
-- [ ] `middleware/consumers.ts` — Hook-based observability consumers
+- [x] `middleware/logging.ts` — Structured logging (pino-compatible)
+- [x] `middleware/cost-tracker.ts` — Budget enforcement, per-model breakdown
+- [x] `middleware/rate-limit.ts` — Token bucket rate limiting
+- [x] `middleware/tracing.ts` — OpenTelemetry spans (no-op if @opentelemetry/api not installed)
+- [x] `middleware/guardrails.ts` — Content safety, regex blocking, prompt-injection heuristic
+- [x] `middleware/prometheus.ts` — Prometheus metrics export (no-op if prom-client not installed)
+- [x] `middleware/consumers.ts` — TracingConsumer, LoggingConsumer, PersistenceConsumer, getTraceContext
 
 ---
 
