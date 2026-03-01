@@ -727,84 +727,47 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
 ---
 
 <a id="phase-6"></a>
-## Phase 6: State Management
+## Phase 6: State Management ✅ COMPLETED
+
+> **Completed**: Phase 6 implements AgentState extensions (transition history, getExtensionsForCheckpoint/setExtensionsFromCheckpoint), checkpoint serialization (version-tagged CheckpointData, serializeMessage/deserializeMessage, checkpointFromState/stateFromCheckpoint, serializeCheckpoint/deserializeCheckpoint), StateStore (InMemoryStateStore, FileStateStore), Session (Session, SessionStore, InMemorySessionStore, FileSessionStore, SessionManager), and wires stateStore/sessionManager in the builder and runtime (state persistence after run, session history load/save in Agent.arun).
+>
+> **Files created/updated**:
+> - `src/core/state/state.ts` — Added transition history (recordTransition, getTransitionHistory, setTransitionHistory), getExtensionsForCheckpoint(), setExtensionsFromCheckpoint(); existing AgentState, StateExtension, toCheckpoint/fromCheckpoint retained.
+> - `src/core/state/checkpoint.ts` — CHECKPOINT_VERSION, CheckpointData, SerializedMessage, serializeMessage/deserializeMessage, checkpointFromState/stateFromCheckpoint, serializeCheckpoint/deserializeCheckpoint.
+> - `src/core/state/state-store.ts` — StateStore interface (save, load with optional StateStoreLoadOptions, list(agentId?), delete), InMemoryStateStore, FileStateStore.
+> - `src/core/state/session.ts` — Session, touchSession, SessionStore (create, get, list, delete, addMessage, getMessages), InMemorySessionStore, FileSessionStore, SessionManager.
+> - `src/core/state/index.ts` — Exports for checkpoint, state-store, session.
+> - `src/core/agent/builder.ts` — .stateStore(store), .sessionManager(manager); stateStore passed to Runtime, sessionManager passed to Agent.
+> - `src/core/agent/runtime.ts` — stateStore in RuntimeConfig; createState uses options.initialMessages; after run, stateStore.save(state).
+> - `src/core/agent/agent.ts` — sessionManager in AgentParams; arun loads session history when sessionId + sessionManager, passes initialMessages to createState; after run, appends new messages to session.
+> - `src/models/agent.ts` — RunOptions.initialMessages added.
+> - `src/index.ts` — Public exports for checkpoint, state-store, session.
+> - `tests/unit/state.test.ts` — 23 tests for checkpoint (message roundtrip, checkpointFromState/stateFromCheckpoint, serialize/deserialize JSON), AgentState transition history, InMemoryStateStore, FileStateStore, InMemorySessionStore, SessionManager, FileSessionStore, touchSession.
+>
+> **Test results**: 163 tests passing (23 new in state.test.ts). Build successful.
 
 ### 6.1 Agent State
-- [ ] `core/state/state.ts`:
-  ```typescript
-  class AgentState {
-    messages: Message[];
-    tools: ToolSchema[];
-    iteration: number;
-    maxIterations: number;
-    metadata: Map<string, unknown>;
-    metrics: AgentMetrics;
-    extensions: Map<string, StateExtension>;
-    runId: string;
-
-    addMessage(msg: Message): void;
-    getExtension<T extends StateExtension>(key: string): T | undefined;
-    setExtension(key: string, ext: StateExtension): void;
-    toCheckpoint(): CheckpointData;
-    static fromCheckpoint(data: CheckpointData): AgentState;
-  }
-
-  interface StateExtension {
-    toDict(): Record<string, unknown>;
-    fromDict(data: Record<string, unknown>): StateExtension;
-  }
-  ```
+- [x] `core/state/state.ts`:
+  - AgentState with messages, toolSchemas, iteration, maxIterations, metadata, metrics, extensions, runId, usage, toolCallRecords, completed, output, model, signal; addMessage, getExtension, setExtension, toCheckpoint, fromCheckpoint (existing).
+  - StateExtension (toDict); StateExtensionFactory for fromDict-style restoration via setExtensionsFromCheckpoint.
+  - Transition history: recordTransition(phase), getTransitionHistory(), setTransitionHistory(); getExtensionsForCheckpoint(), setExtensionsFromCheckpoint(data, factories).
 
 ### 6.2 State Store
-- [ ] `core/state/state-store.ts`:
-  ```typescript
-  interface StateStore {
-    save(state: AgentState): Promise<void>;
-    load(runId: string): Promise<AgentState | null>;
-    list(): Promise<string[]>;
-    delete(runId: string): Promise<void>;
-  }
-
-  class InMemoryStateStore implements StateStore { ... }
-  class FileStateStore implements StateStore { ... }
-  ```
+- [x] `core/state/state-store.ts`:
+  - StateStore: save(state), load(runId, options?), list(agentId?), delete(runId).
+  - InMemoryStateStore, FileStateStore (directory, one JSON file per run).
 
 ### 6.3 Checkpoint
-- [ ] `core/state/checkpoint.ts`:
-  - Serialize/deserialize AgentState to JSON
-  - Version-tagged for migration support
-  - Include message history, tool schemas, extensions
+- [x] `core/state/checkpoint.ts`:
+  - Serialize/deserialize AgentState to JSON; CHECKPOINT_VERSION; CheckpointData (version, runId, agentId, iteration, timestamp, messages, toolSchemas, metadata, usage, metrics, toolCallRecords, extensions, completed, output, model, maxIterations, transitionHistory).
+  - serializeMessage/deserializeMessage; checkpointFromState(state), stateFromCheckpoint(data, extensionFactories); serializeCheckpoint/deserializeCheckpoint.
 
 ### 6.4 Session Management
-- [ ] `core/state/session.ts`:
-  ```typescript
-  interface Session {
-    id: string;
-    agentId: string;
-    metadata: Record<string, unknown>;
-    createdAt: Date;
-    updatedAt: Date;
-  }
-
-  interface SessionStore {
-    create(agentId: string, metadata?: Record<string, unknown>): Promise<Session>;
-    get(sessionId: string): Promise<Session | null>;
-    addMessage(sessionId: string, message: Message): Promise<void>;
-    getMessages(sessionId: string, limit?: number): Promise<Message[]>;
-    list(agentId?: string): Promise<Session[]>;
-    delete(sessionId: string): Promise<void>;
-  }
-
-  class InMemorySessionStore implements SessionStore { ... }
-  class FileSessionStore implements SessionStore { ... }
-
-  class SessionManager {
-    create(agentId: string): Promise<Session>;
-    get(sessionId: string): Promise<Session>;
-    listSessions(agentId?: string): Promise<Session[]>;
-    delete(sessionId: string): Promise<void>;
-  }
-  ```
+- [x] `core/state/session.ts`:
+  - Session (id, agentId, metadata, createdAt, updatedAt), touchSession.
+  - SessionStore: create(agentId, metadata?), get(sessionId), list(agentId?, limit?), delete(sessionId), addMessage(sessionId, message), getMessages(sessionId, limit?).
+  - InMemorySessionStore, FileSessionStore (directory per session, meta.json + messages.json).
+  - SessionManager(store): create, get, listSessions, delete, addMessage, getMessages.
 
 ---
 

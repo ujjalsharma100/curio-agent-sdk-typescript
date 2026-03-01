@@ -94,6 +94,8 @@ export interface RunOptions {
   timeout?: number;
   /** Arbitrary metadata attached to this run. */
   metadata?: Record<string, unknown>;
+  /** Pre-loaded session messages (used when sessionId is set to build conversation context). */
+  initialMessages?: Message[];
 }
 
 /** Identity information for an agent. */

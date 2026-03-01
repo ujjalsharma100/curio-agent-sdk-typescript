@@ -26,6 +26,7 @@ import { AgentBuilder } from "./builder.js";
 import { ToolRegistry } from "../tools/registry.js";
 import { HookRegistry } from "../events/hooks.js";
 import type { Tool } from "../tools/tool.js";
+import type { SessionManager } from "../state/session.js";
 
 /** Parameters for direct Agent construction (used by the builder). */
 export interface AgentParams {
@@ -36,6 +37,7 @@ export interface AgentParams {
   toolRegistry: ToolRegistry;
   hookRegistry: HookRegistry;
   metadata?: Record<string, unknown>;
+  sessionManager?: SessionManager;
 }
 
 export class Agent {
@@ -51,6 +53,7 @@ export class Agent {
   private readonly _toolRegistry: ToolRegistry;
   private readonly _hookRegistry: HookRegistry;
   private readonly _metadata: Record<string, unknown>;
+  private readonly _sessionManager?: SessionManager;
   private _closed = false;
 
   constructor(params: AgentParams) {
@@ -61,6 +64,7 @@ export class Agent {
     this._toolRegistry = params.toolRegistry;
     this._hookRegistry = params.hookRegistry;
     this._metadata = params.metadata ?? {};
+    this._sessionManager = params.sessionManager;
   }
 
   // ── Static builder ───────────────────────────────────────────────────────
@@ -115,8 +119,22 @@ export class Agent {
    */
   async arun(input: string, options?: RunOptions): Promise<AgentRunResult> {
     this.ensureNotClosed();
-    const state = this.runtime.createState(input, options);
-    return this.runtime.runWithState(state);
+    let runOptions = options;
+    if (options?.sessionId && this._sessionManager) {
+      const history = await this._sessionManager.getMessages(options.sessionId);
+      runOptions = { ...options, initialMessages: history };
+    }
+    const state = this.runtime.createState(input, runOptions);
+    const result = await this.runtime.runWithState(state);
+    // Persist new messages to session for multi-turn continuity
+    if (options?.sessionId && this._sessionManager && runOptions?.initialMessages != null) {
+      const startIndex = 1 + runOptions.initialMessages.length; // after system + history
+      for (let i = startIndex; i < state.messages.length; i++) {
+        const msg = state.messages[i];
+        if (msg) await this._sessionManager.addMessage(options.sessionId, msg);
+      }
+    }
+    return result;
   }
 
   /**

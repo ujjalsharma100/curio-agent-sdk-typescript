@@ -156,6 +156,20 @@ export { ToolCallingLoop } from "./core/loops/index.js";
 // ── Core: State ──────────────────────────────────────────────────────────────
 export { AgentState } from "./core/state/index.js";
 export type { StateExtension, StateExtensionFactory } from "./core/state/index.js";
+export {
+  CHECKPOINT_VERSION,
+  checkpointFromState,
+  stateFromCheckpoint,
+  serializeCheckpoint,
+  deserializeCheckpoint,
+  serializeMessage,
+  deserializeMessage,
+} from "./core/state/index.js";
+export type { CheckpointData, SerializedMessage } from "./core/state/index.js";
+export type { StateStore, StateStoreLoadOptions } from "./core/state/index.js";
+export { InMemoryStateStore, FileStateStore } from "./core/state/index.js";
+export type { Session, SessionStore } from "./core/state/index.js";
+export { touchSession, InMemorySessionStore, FileSessionStore, SessionManager } from "./core/state/index.js";
 
 // ── Core: Events ─────────────────────────────────────────────────────────────
 export { HookRegistry } from "./core/events/index.js";

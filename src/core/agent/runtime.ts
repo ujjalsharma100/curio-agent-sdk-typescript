@@ -11,6 +11,7 @@ import type { StreamEvent } from "../../models/events.js";
 import { HookContext, HookEvent } from "../../models/events.js";
 import { AgentState } from "../state/state.js";
 import type { AgentLoop } from "../loops/base.js";
+import type { StateStore } from "../state/state-store.js";
 import { HookRegistry } from "../events/hooks.js";
 import { ToolRegistry } from "../tools/registry.js";
 
@@ -32,6 +33,8 @@ export interface RuntimeConfig {
   timeout: number;
   /** Agent identity. */
   agentId: string;
+  /** Optional state store for run persistence. */
+  stateStore?: StateStore;
 }
 
 export class Runtime {
@@ -55,6 +58,11 @@ export class Runtime {
       messages.push({ role: "system", content: systemPrompt });
     }
 
+    // Optional session history (between system and new user message)
+    const initialMessages = options?.initialMessages ?? [];
+    for (const m of initialMessages) {
+      messages.push(m);
+    }
     // User message
     messages.push({ role: "user", content: input });
 
@@ -134,6 +142,11 @@ export class Runtime {
           iteration: state.iteration,
         }),
       );
+
+      // Persist state if store is configured
+      if (this.config.stateStore) {
+        await this.config.stateStore.save(state);
+      }
 
       return result;
     } catch (err) {

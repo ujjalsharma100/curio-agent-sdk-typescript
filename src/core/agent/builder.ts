@@ -15,6 +15,8 @@
 import type { HookHandler } from "../../models/events.js";
 import type { ILLMClient } from "../llm/client.js";
 import type { AgentLoop } from "../loops/base.js";
+import type { StateStore } from "../state/state-store.js";
+import type { SessionManager } from "../state/session.js";
 import { Tool } from "../tools/tool.js";
 import { ToolRegistry } from "../tools/registry.js";
 import { ToolExecutor } from "../tools/executor.js";
@@ -39,6 +41,8 @@ export interface AgentConfig {
   agentName: string;
   onEvent?: (event: unknown) => void;
   metadata: Record<string, unknown>;
+  stateStore?: StateStore;
+  sessionManager?: SessionManager;
 }
 
 export class AgentBuilder {
@@ -132,6 +136,18 @@ export class AgentBuilder {
     return this;
   }
 
+  /** Set the state store for run persistence (save/load/resume). */
+  stateStore(store: StateStore): this {
+    this.config.stateStore = store;
+    return this;
+  }
+
+  /** Set the session manager for multi-turn conversation history. */
+  sessionManager(manager: SessionManager): this {
+    this.config.sessionManager = manager;
+    return this;
+  }
+
   /** Build the agent. Requires at minimum a model and an LLM client. */
   build(): Agent {
     // Build tool registry
@@ -170,6 +186,7 @@ export class AgentBuilder {
       maxIterations: this.config.maxIterations,
       timeout: this.config.timeout,
       agentId: this.config.agentId,
+      stateStore: this.config.stateStore,
     });
 
     return new Agent({
@@ -180,6 +197,7 @@ export class AgentBuilder {
       toolRegistry,
       hookRegistry,
       metadata: this.config.metadata,
+      sessionManager: this.config.sessionManager,
     });
   }
 }

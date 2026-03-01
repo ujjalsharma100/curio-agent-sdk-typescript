@@ -62,6 +62,12 @@ export class AgentState {
   /** Typed state extensions (plan mode, etc.). */
   private extensions: Map<string, StateExtension>;
 
+  /** State transition history (phase name -> monotonic timestamp). */
+  private transitionHistory: [string, number][] = [];
+
+  /** Current phase name. */
+  currentPhase = "";
+
   /** Whether the run has been completed (final answer produced). */
   completed: boolean;
 
@@ -121,6 +127,55 @@ export class AgentState {
   /** Set a state extension. */
   setExtension(key: string, extension: StateExtension): void {
     this.extensions.set(key, extension);
+  }
+
+  /** Record a state transition (e.g. planning -> executing). */
+  recordTransition(phase: string): void {
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    this.transitionHistory.push([phase, now]);
+    this.currentPhase = phase;
+  }
+
+  /** Return the list of (phase_name, monotonic_timestamp) transitions. */
+  getTransitionHistory(): [string, number][] {
+    return [...this.transitionHistory];
+  }
+
+  /** Restore transition history (e.g. after loading from checkpoint). */
+  setTransitionHistory(history: [string, number][]): void {
+    this.transitionHistory = [...history];
+    const last = history[history.length - 1];
+    this.currentPhase = last ? last[0] : "";
+  }
+
+  /** Serialize extensions for checkpoint. Keys are extension keys; values are toDict() payloads. */
+  getExtensionsForCheckpoint(): Record<string, Record<string, unknown>> {
+    const out: Record<string, Record<string, unknown>> = {};
+    for (const [key, ext] of this.extensions) {
+      try {
+        out[key] = { ...ext.toDict() };
+      } catch {
+        // Skip extensions that fail to serialize
+      }
+    }
+    return out;
+  }
+
+  /** Restore extensions from checkpoint data using the given factories. */
+  setExtensionsFromCheckpoint(
+    data: Record<string, Record<string, unknown>>,
+    factories: Map<string, StateExtensionFactory>,
+  ): void {
+    for (const [key, payload] of Object.entries(data)) {
+      const factory = factories.get(key);
+      if (factory) {
+        try {
+          this.setExtension(key, factory(payload));
+        } catch {
+          // Skip extensions that fail to deserialize
+        }
+      }
+    }
   }
 
   /** Check if the run should be aborted. */
