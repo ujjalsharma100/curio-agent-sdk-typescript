@@ -175,6 +175,19 @@ export { touchSession, InMemorySessionStore, FileSessionStore, SessionManager } 
 export { HookRegistry, EventFilter, InMemoryEventBus } from "./core/events/index.js";
 export type { EventBus, DeadLetterEntry, InMemoryEventBusOptions } from "./core/events/index.js";
 
+// ── Core: Context & Instructions ─────────────────────────────────────────────
+export { ContextManager, SUMMARIZE_PLACEHOLDER } from "./core/context/index.js";
+export type { ContextManagerOptions, ContextStrategy } from "./core/context/index.js";
+export {
+  InstructionLoader,
+  loadInstructionsFromFile,
+  findProjectRoot,
+  defaultSearchPaths,
+  DEFAULT_INSTRUCTION_FILES,
+  PROJECT_ROOT_MARKERS,
+} from "./core/context/index.js";
+export type { InstructionLoaderOptions } from "./core/context/index.js";
+
 // ── Middleware (also available as curio-agent-sdk/middleware) ──────────────────
 export type { Middleware } from "./middleware/base.js";
 export { MiddlewarePipeline } from "./middleware/base.js";

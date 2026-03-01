@@ -21,6 +21,7 @@ import type {
   ResponseFormat,
 } from "../../models/llm.js";
 import type { StreamEvent } from "../../models/events.js";
+import type { ContextManager } from "../context/context.js";
 import { ToolExecutor } from "../tools/executor.js";
 import { HookRegistry } from "../events/hooks.js";
 import { HookContext, HookEvent } from "../../models/events.js";
@@ -35,6 +36,8 @@ export interface ToolCallingLoopOptions {
   maxTokens?: number;
   /** Temperature for each LLM call. */
   temperature?: number;
+  /** Optional context manager to fit messages within token budget before each LLM call. */
+  contextManager?: ContextManager;
 }
 
 export class ToolCallingLoop implements AgentLoop {
@@ -42,6 +45,7 @@ export class ToolCallingLoop implements AgentLoop {
   private readonly responseFormat?: ResponseFormat;
   private readonly maxTokens?: number;
   private readonly temperature?: number;
+  private readonly contextManager?: ContextManager;
 
   constructor(
     private readonly llmClient: ILLMClient,
@@ -53,6 +57,7 @@ export class ToolCallingLoop implements AgentLoop {
     this.responseFormat = options.responseFormat;
     this.maxTokens = options.maxTokens;
     this.temperature = options.temperature;
+    this.contextManager = options.contextManager;
   }
 
   async step(state: AgentState): Promise<AgentState> {
@@ -75,9 +80,19 @@ export class ToolCallingLoop implements AgentLoop {
       return state;
     }
 
+    // Fit messages to token budget when context manager is set
+    let messagesToSend: Message[] = state.messages;
+    if (this.contextManager) {
+      messagesToSend = await this.contextManager.fitMessages(
+        state.messages,
+        state.toolSchemas.length > 0 ? state.toolSchemas : undefined,
+        state.model,
+      );
+    }
+
     // Build LLM request (responseFormat only when no tools — providers often disallow both)
     const request: LLMRequest = {
-      messages: state.messages,
+      messages: messagesToSend,
       model: state.model,
       tools: state.toolSchemas.length > 0 ? state.toolSchemas : undefined,
       ...(this.maxTokens !== undefined && { maxTokens: this.maxTokens }),
@@ -256,8 +271,18 @@ export class ToolCallingLoop implements AgentLoop {
       return;
     }
 
+    // Fit messages to token budget when context manager is set
+    let messagesToSend: Message[] = state.messages;
+    if (this.contextManager) {
+      messagesToSend = await this.contextManager.fitMessages(
+        state.messages,
+        state.toolSchemas.length > 0 ? state.toolSchemas : undefined,
+        state.model,
+      );
+    }
+
     const request: LLMRequest = {
-      messages: state.messages,
+      messages: messagesToSend,
       model: state.model,
       tools: state.toolSchemas.length > 0 ? state.toolSchemas : undefined,
       ...(this.maxTokens !== undefined && { maxTokens: this.maxTokens }),

@@ -19,6 +19,7 @@ import type { StateStore } from "../state/state-store.js";
 import type { SessionManager } from "../state/session.js";
 import type { Middleware } from "../../middleware/base.js";
 import type { MemoryManager } from "../../memory/manager.js";
+import type { ContextManager } from "../context/context.js";
 import { Tool } from "../tools/tool.js";
 import { ToolRegistry } from "../tools/registry.js";
 import { ToolExecutor } from "../tools/executor.js";
@@ -48,6 +49,7 @@ export interface AgentConfig {
   stateStore?: StateStore;
   sessionManager?: SessionManager;
   memoryManager?: MemoryManager;
+  contextManager?: ContextManager;
 }
 
 export class AgentBuilder {
@@ -172,6 +174,12 @@ export class AgentBuilder {
     return this;
   }
 
+  /** Set the context manager for token budget enforcement and message fitting. */
+  contextManager(manager: ContextManager): this {
+    this.config.contextManager = manager;
+    return this;
+  }
+
   /** Build the agent. Requires at minimum a model and an LLM client. */
   build(): Agent {
     // Build tool registry
@@ -205,7 +213,11 @@ export class AgentBuilder {
       middlewarePipeline: this.config.middleware.length > 0 ? pipeline : undefined,
     });
 
-    const loop = this.config.loop ?? new ToolCallingLoop(llmClient, toolExecutor, hookRegistry);
+    const loop =
+      this.config.loop ??
+      new ToolCallingLoop(llmClient, toolExecutor, hookRegistry, {
+        contextManager: this.config.contextManager,
+      });
 
     // Register memory manager tools if present
     if (this.config.memoryManager) {

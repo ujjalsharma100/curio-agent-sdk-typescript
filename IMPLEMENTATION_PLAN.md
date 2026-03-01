@@ -950,13 +950,28 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
 ---
 
 <a id="phase-10"></a>
-## Phase 10: Context & Instructions
+## Phase 10: Context & Instructions ✅ COMPLETED
+
+> **Completed**: Phase 10 implemented ContextManager (token budget, truncate_oldest/summarize)
+> and InstructionLoader (hierarchical file loading, optional file watch). ContextManager is
+> wired into the agent builder and ToolCallingLoop so messages are fitted before each LLM call.
+>
+> **Files created/updated**:
+> - `src/core/context/context.ts` — ContextManager with fitMessages(), countTokens(), groupMessages(), truncate_oldest and summarize strategies, optional summarizer callback
+> - `src/core/context/instructions.ts` — InstructionLoader with load(), findProjectRoot(), defaultSearchPaths(), loadInstructionsFromFile(), watch() for live reload
+> - `src/core/context/index.ts` — Barrel exports
+> - `src/core/agent/builder.ts` — contextManager in AgentConfig, .contextManager(), pass to ToolCallingLoop
+> - `src/core/loops/tool-calling.ts` — contextManager option, fit messages before LLM request in step() and streamStep()
+> - `src/index.ts` — Phase 10 exports
+>
+> **Test results**: See tests/unit/context.test.ts
 
 ### 10.1 Context Manager
-- [ ] `core/context/context.ts`:
+- [x] `core/context/context.ts`:
   ```typescript
   class ContextManager {
-    constructor(options: { maxTokens: number; reserveTokens?: number; strategy?: 'truncate_oldest' | 'summarize' });
+    constructor(options: { maxTokens: number; reserveTokens?: number; strategy?: 'truncate_oldest' | 'summarize'; summarizer?: (msgs, model, tools) => Message | Promise<Message> });
+    countTokens(messages, model, tools?): Promise<number>;
     fitMessages(messages: Message[], tools?: ToolSchema[], model?: string): Promise<Message[]>;
   }
   ```
@@ -965,11 +980,11 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
   - Truncation or summarization strategy
 
 ### 10.2 Instruction Loader
-- [ ] `core/context/instructions.ts`:
-  - Load from configurable file names
-  - Hierarchical: global → project → directory
-  - Dynamic injection mid-session
-  - File watching for live reload
+- [x] `core/context/instructions.ts`:
+  - Load from configurable file names (DEFAULT_INSTRUCTION_FILES: AGENT.md, .agent/rules.md)
+  - Hierarchical: global (~/.agent) → project root → cwd (findProjectRoot, defaultSearchPaths)
+  - loadInstructionsFromFile(path) for single-file load
+  - watch(onReload) for live reload; returns unsubscribe
 
 ---
 
