@@ -1,0 +1,117 @@
+{
+  "name": "curio-agent-sdk",
+  "version": "0.1.0",
+  "description": "Production-grade agent harness for building autonomous AI agents — TypeScript edition",
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./testing": {
+      "import": {
+        "types": "./dist/testing/index.d.ts",
+        "default": "./dist/testing/index.js"
+      },
+      "require": {
+        "types": "./dist/testing/index.d.cts",
+        "default": "./dist/testing/index.cjs"
+      }
+    },
+    "./memory": {
+      "import": {
+        "types": "./dist/memory/index.d.ts",
+        "default": "./dist/memory/index.js"
+      },
+      "require": {
+        "types": "./dist/memory/index.d.cts",
+        "default": "./dist/memory/index.cjs"
+      }
+    },
+    "./middleware": {
+      "import": {
+        "types": "./dist/middleware/index.d.ts",
+        "default": "./dist/middleware/index.js"
+      },
+      "require": {
+        "types": "./dist/middleware/index.d.cts",
+        "default": "./dist/middleware/index.cjs"
+      }
+    }
+  },
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src/ tests/",
+    "lint:fix": "eslint src/ tests/ --fix",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "llm",
+    "sdk",
+    "autonomous",
+    "tools",
+    "anthropic",
+    "openai",
+    "mcp"
+  ],
+  "author": "",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "zod": "^3.23.0",
+    "zod-to-json-schema": "^3.23.0",
+    "dotenv": "^16.4.0",
+    "pino": "^9.0.0",
+    "uuid": "^10.0.0"
+  },
+  "optionalDependencies": {
+    "openai": "^4.70.0",
+    "@anthropic-ai/sdk": "^0.30.0",
+    "gpt-tokenizer": "^2.2.0",
+    "better-sqlite3": "^11.0.0",
+    "pg": "^8.13.0",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "playwright": "^1.48.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "tsup": "^8.3.0",
+    "vitest": "^2.1.0",
+    "@vitest/coverage-v8": "^2.1.0",
+    "eslint": "^9.13.0",
+    "@typescript-eslint/eslint-plugin": "^8.10.0",
+    "@typescript-eslint/parser": "^8.10.0",
+    "prettier": "^3.3.0",
+    "@types/node": "^22.0.0",
+    "@types/uuid": "^10.0.0",
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/pg": "^8.11.0"
+  }
+}
