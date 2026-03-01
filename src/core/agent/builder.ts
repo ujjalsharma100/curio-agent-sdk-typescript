@@ -146,8 +146,8 @@ export class AgentBuilder {
       hookRegistry.on(event, handler, priority);
     }
 
-    // Build tool executor
-    const toolExecutor = new ToolExecutor(toolRegistry);
+    // Build tool executor (with hook registry so executor emits tool.call.* hooks)
+    const toolExecutor = new ToolExecutor(toolRegistry, { hookRegistry });
 
     // Build loop (default: ToolCallingLoop)
     const llmClient = this.config.llmClient;

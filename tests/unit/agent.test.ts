@@ -404,7 +404,6 @@ describe("ToolCallingLoop", () => {
 
     const reg = new ToolRegistry();
     reg.register(makeTool("echo", (args) => String(args["msg"])));
-    const executor = new ToolExecutor(reg);
     const hooks = new HookRegistry();
     const firedEvents: string[] = [];
 
@@ -415,6 +414,7 @@ describe("ToolCallingLoop", () => {
     hooks.on(HookEvent.TOOL_CALL_BEFORE, () => { firedEvents.push("tool.before"); });
     hooks.on(HookEvent.TOOL_CALL_AFTER, () => { firedEvents.push("tool.after"); });
 
+    const executor = new ToolExecutor(reg, { hookRegistry: hooks });
     const loop = new ToolCallingLoop(llm, executor, hooks);
     const state = new AgentState({
       messages: [{ role: "user", content: "echo" }],
@@ -439,13 +439,13 @@ describe("ToolCallingLoop", () => {
 
     const reg = new ToolRegistry();
     reg.register(makeTool("dangerous", () => "should not run"));
-    const executor = new ToolExecutor(reg);
     const hooks = new HookRegistry();
 
     hooks.on(HookEvent.TOOL_CALL_BEFORE, (ctx) => {
       if (ctx.data["tool"] === "dangerous") ctx.cancel();
     });
 
+    const executor = new ToolExecutor(reg, { hookRegistry: hooks });
     const loop = new ToolCallingLoop(llm, executor, hooks);
     const state = new AgentState({
       messages: [{ role: "user", content: "do it" }],

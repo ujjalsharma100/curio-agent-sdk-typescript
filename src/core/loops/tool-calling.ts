@@ -9,7 +9,7 @@
 import type { AgentLoop } from "./base.js";
 import type { ILLMClient } from "../llm/client.js";
 import type { AgentState } from "../state/state.js";
-import type { Message, ToolCall, LLMRequest } from "../../models/llm.js";
+import type { Message, ToolCall, ToolResult, LLMRequest } from "../../models/llm.js";
 import { ToolExecutor } from "../tools/executor.js";
 import { HookRegistry } from "../events/hooks.js";
 import { HookContext, HookEvent } from "../../models/events.js";
@@ -178,72 +178,18 @@ export class ToolCallingLoop implements AgentLoop {
     return true;
   }
 
-  /** Execute tool calls with hooks. */
+  /** Execute tool calls (executor emits tool.call.before/after/error when hookRegistry is set). */
   private async executeToolCalls(
     state: AgentState,
     toolCalls: ToolCall[],
   ) {
-    const results = [];
-
+    const execContext = { runId: state.runId, agentId: state.agentId };
+    const results: ToolResult[] = [];
     for (const call of toolCalls) {
-      // Emit tool.call.before
-      const beforeCtx = new HookContext({
-        event: HookEvent.TOOL_CALL_BEFORE,
-        data: { tool: call.name, args: call.arguments, toolCallId: call.id },
-        runId: state.runId,
-        iteration: state.iteration,
-      });
-      await this.hooks.emit(HookEvent.TOOL_CALL_BEFORE, beforeCtx);
-
-      if (beforeCtx.cancelled) {
-        results.push({
-          toolCallId: call.id,
-          toolName: call.name,
-          result: "",
-          error: "Tool call cancelled by hook",
-          duration: 0,
-        });
-        continue;
-      }
-
-      // Use possibly-modified args from hook
-      const modifiedArgs = (beforeCtx.data["args"] as Record<string, unknown>) ?? call.arguments;
-      const modifiedCall = { ...call, arguments: modifiedArgs };
-
       state.metrics.toolCalls++;
-      const toolResult = await this.toolExecutor.executeTool(modifiedCall);
-
-      // Emit tool.call.after or tool.call.error
-      if (toolResult.error) {
-        await this.hooks.emit(
-          HookEvent.TOOL_CALL_ERROR,
-          new HookContext({
-            event: HookEvent.TOOL_CALL_ERROR,
-            data: { tool: call.name, error: toolResult.error, toolCallId: call.id },
-            runId: state.runId,
-            iteration: state.iteration,
-          }),
-        );
-      } else {
-        await this.hooks.emit(
-          HookEvent.TOOL_CALL_AFTER,
-          new HookContext({
-            event: HookEvent.TOOL_CALL_AFTER,
-            data: {
-              tool: call.name,
-              result: toolResult.result,
-              duration: toolResult.duration,
-              toolCallId: call.id,
-            },
-            runId: state.runId,
-            iteration: state.iteration,
-          }),
-        );
-      }
-
+      const toolResult = await this.toolExecutor.executeTool(call, execContext);
       results.push(toolResult);
     }
-
     return results;
   }
 }

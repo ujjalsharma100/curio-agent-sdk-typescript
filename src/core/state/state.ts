@@ -44,6 +44,9 @@ export class AgentState {
   /** Unique run identifier. */
   readonly runId: string;
 
+  /** Optional agent identifier (set by runtime for hook context). */
+  agentId?: string;
+
   /** Aggregate token usage across all LLM calls in this run. */
   usage: TokenUsage;
 
@@ -76,6 +79,7 @@ export class AgentState {
     toolSchemas?: ToolSchema[];
     maxIterations?: number;
     runId?: string;
+    agentId?: string;
     model?: string;
     signal?: AbortSignal;
   }) {
@@ -84,6 +88,7 @@ export class AgentState {
     this.iteration = 0;
     this.maxIterations = params.maxIterations ?? 50;
     this.runId = params.runId ?? generateId();
+    this.agentId = params.agentId;
     this.usage = emptyTokenUsage();
     this.metrics = emptyMetrics();
     this.toolCallRecords = [];

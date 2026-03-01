@@ -63,6 +63,7 @@ export class Runtime {
       toolSchemas: this.config.toolRegistry.getSchemas(),
       maxIterations: options?.maxIterations ?? this.config.maxIterations,
       model: this.config.model,
+      agentId: this.config.agentId,
       signal: options?.signal,
     });
 

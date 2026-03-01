@@ -115,8 +115,30 @@ export { Runtime } from "./core/agent/index.js";
 export type { AgentParams, AgentConfig, RuntimeConfig } from "./core/agent/index.js";
 
 // ── Core: Tools ──────────────────────────────────────────────────────────────
-export { Tool, ToolRegistry, ToolExecutor } from "./core/tools/index.js";
-export type { ToolConfig, ToolExecuteFn } from "./core/tools/index.js";
+export {
+  Tool,
+  ToolRegistry,
+  ToolExecutor,
+  createTool,
+  tool,
+  createToolsFromInstance,
+  getToolMeta,
+  ToolSchemaDefinition,
+  fromZod,
+} from "./core/tools/index.js";
+export type {
+  ToolConfig,
+  ToolExecuteFn,
+  ToolValidateFn,
+  CreateToolOptions,
+  ToolMethodMeta,
+  ToolExecutorOptions,
+  ToolExecutorContext,
+  PermissionPolicy,
+  ToolPermissionContext,
+  ToolPermissionResult,
+  FromZodOptions,
+} from "./core/tools/index.js";
 
 // ── Core: LLM ────────────────────────────────────────────────────────────────
 export { LLMClient } from "./core/llm/index.js";

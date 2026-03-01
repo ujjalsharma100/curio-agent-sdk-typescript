@@ -630,10 +630,14 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
 ---
 
 <a id="phase-4"></a>
-## Phase 4: Tool System
+## Phase 4: Tool System ✅ COMPLETED
+
+> **Completed**: Phase 4 implementation adds ToolSchemaDefinition/fromZod, createTool/tool decorator,
+> ToolExecutor with caching (TTL), idempotency, hooks (tool.call.before/after/error), and optional
+> PermissionPolicy. Tests in `tests/unit/tools.test.ts`.
 
 ### 4.1 Tool Class
-- [ ] `core/tools/tool.ts`:
+- [x] `core/tools/tool.ts`:
   ```typescript
   interface ToolConfig {
     timeout?: number;
@@ -665,14 +669,14 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
   ```
 
 ### 4.2 Schema System
-- [ ] `core/tools/schema.ts`:
+- [x] `core/tools/schema.ts`:
   - Zod → JSON Schema conversion (using `zod-to-json-schema`)
   - `ToolSchema` class with `validate()`, `toJsonSchema()`, `toLLMSchema()`
   - `fromZod(schema: ZodSchema): ToolSchema`
   - Support for all JSON Schema types
 
 ### 4.3 Tool Registry
-- [ ] `core/tools/registry.ts`:
+- [x] `core/tools/registry.ts`:
   - `register(tool: Tool): void`
   - `get(name: string): Tool | undefined`
   - `has(name: string): boolean`
@@ -681,7 +685,7 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
   - Iterable interface
 
 ### 4.4 Tool Executor
-- [ ] `core/tools/executor.ts`:
+- [x] `core/tools/executor.ts`:
   - `executeTool(name: string, args: Record<string, unknown>): Promise<ToolResult>`
   - `executeParallel(calls: ToolCall[]): Promise<ToolResult[]>`
   - Timeout enforcement
