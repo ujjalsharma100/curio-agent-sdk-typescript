@@ -12,6 +12,7 @@ import { HookContext, HookEvent } from "../../models/events.js";
 import { AgentState } from "../state/state.js";
 import type { AgentLoop } from "../loops/base.js";
 import type { StateStore } from "../state/state-store.js";
+import type { MemoryManager } from "../../memory/manager.js";
 import { HookRegistry } from "../events/hooks.js";
 import { ToolRegistry } from "../tools/registry.js";
 
@@ -35,6 +36,8 @@ export interface RuntimeConfig {
   agentId: string;
   /** Optional state store for run persistence. */
   stateStore?: StateStore;
+  /** Optional memory manager for memory injection/saving. */
+  memoryManager?: MemoryManager;
 }
 
 export class Runtime {
@@ -103,6 +106,14 @@ export class Runtime {
       return this.buildResult(state, startTime);
     }
 
+    // Memory injection
+    const mm = this.config.memoryManager;
+    if (mm) {
+      const userInput = this.getLastUserInput(state);
+      await mm.inject(state, userInput);
+      await mm.onRunStart(userInput, state);
+    }
+
     // Set up timeout
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const timeout = state.metadata.get("timeout") as number | undefined ?? this.config.timeout;
@@ -143,6 +154,12 @@ export class Runtime {
         }),
       );
 
+      // Memory save on run end
+      if (mm) {
+        const userInput = this.getLastUserInput(state);
+        await mm.onRunEnd(userInput, result.output, state);
+      }
+
       // Persist state if store is configured
       if (this.config.stateStore) {
         await this.config.stateStore.save(state);
@@ -150,6 +167,12 @@ export class Runtime {
 
       return result;
     } catch (err) {
+      // Memory save on error
+      if (mm) {
+        const userInput = this.getLastUserInput(state);
+        await mm.onRunError(userInput, err instanceof Error ? err.message : String(err), state);
+      }
+
       // Emit agent.run.error
       await this.config.hooks.emit(
         HookEvent.AGENT_RUN_ERROR,
@@ -262,6 +285,17 @@ export class Runtime {
       );
       yield { type: "error", error: err instanceof Error ? err : new Error(String(err)) };
     }
+  }
+
+  /** Extract the last user input text from state messages. */
+  private getLastUserInput(state: AgentState): string {
+    for (let i = state.messages.length - 1; i >= 0; i--) {
+      const msg = state.messages[i];
+      if (msg?.role === "user") {
+        return typeof msg.content === "string" ? msg.content : "";
+      }
+    }
+    return "";
   }
 
   /** Build the final run result from state. */

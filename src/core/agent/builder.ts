@@ -18,6 +18,7 @@ import type { AgentLoop } from "../loops/base.js";
 import type { StateStore } from "../state/state-store.js";
 import type { SessionManager } from "../state/session.js";
 import type { Middleware } from "../../middleware/base.js";
+import type { MemoryManager } from "../../memory/manager.js";
 import { Tool } from "../tools/tool.js";
 import { ToolRegistry } from "../tools/registry.js";
 import { ToolExecutor } from "../tools/executor.js";
@@ -46,6 +47,7 @@ export interface AgentConfig {
   metadata: Record<string, unknown>;
   stateStore?: StateStore;
   sessionManager?: SessionManager;
+  memoryManager?: MemoryManager;
 }
 
 export class AgentBuilder {
@@ -164,6 +166,12 @@ export class AgentBuilder {
     return this;
   }
 
+  /** Set the memory manager for memory injection, saving, and querying. */
+  memoryManager(manager: MemoryManager): this {
+    this.config.memoryManager = manager;
+    return this;
+  }
+
   /** Build the agent. Requires at minimum a model and an LLM client. */
   build(): Agent {
     // Build tool registry
@@ -199,6 +207,15 @@ export class AgentBuilder {
 
     const loop = this.config.loop ?? new ToolCallingLoop(llmClient, toolExecutor, hookRegistry);
 
+    // Register memory manager tools if present
+    if (this.config.memoryManager) {
+      for (const t of this.config.memoryManager.getTools()) {
+        if (!toolRegistry.has(t.name)) {
+          toolRegistry.register(t);
+        }
+      }
+    }
+
     // Build runtime
     const runtime = new Runtime({
       loop,
@@ -210,6 +227,7 @@ export class AgentBuilder {
       timeout: this.config.timeout,
       agentId: this.config.agentId,
       stateStore: this.config.stateStore,
+      memoryManager: this.config.memoryManager,
     });
 
     return new Agent({

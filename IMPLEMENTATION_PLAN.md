@@ -835,10 +835,69 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
 ---
 
 <a id="phase-9"></a>
-## Phase 9: Memory System
+## Phase 9: Memory System ✅ COMPLETED
+
+> **Completed on**: 2026-03-02
+>
+> **What was implemented**:
+>
+> **Base types (`memory/base.ts`)**:
+> - `MemoryEntry` class (id, content, metadata, relevance, createdAt, updatedAt) with `toDict()`/`fromDict()` serialization
+> - `Memory` interface (add, search, getContext, optional get/delete/clear/count)
+>
+> **Strategies (`memory/strategies.ts`)**:
+> - `MemoryInjectionStrategy` interface with 3 implementations: `DefaultInjection` (system message at position 1), `UserMessageInjection` (append to last user msg), `NoInjection`
+> - `MemorySaveStrategy` interface with 5 implementations: `DefaultSave`, `SaveEverythingStrategy` (+ tool results), `SaveSummaryStrategy` (custom summarizer fn), `NoSave`, `PerIterationSave`
+> - `MemoryQueryStrategy` interface with 3 implementations: `DefaultQuery`, `KeywordQuery` (stop word removal), `AdaptiveTokenQuery` (budget decays with conversation length)
+>
+> **MemoryManager (`memory/manager.ts`)**:
+> - Component lifecycle (delegates to memory if Component)
+> - Lifecycle hooks: `inject()`, `onRunStart()`, `onRunEnd()`, `onRunError()`, `onIteration()`, `onToolResult()`
+> - Direct memory access: `add()`, `search()`, `getContext()`, `clear()`, `count()`
+> - Agent tools: `save_to_memory`, `search_memory`, `forget_memory` (auto-registered in builder)
+>
+> **9 Memory backends**:
+> - `ConversationMemory` — Sliding window (recency + keyword scoring)
+> - `VectorMemory` — Cosine similarity with embeddings (Component lifecycle, optional disk persistence, OpenAI fallback + simple hash embedding)
+> - `KeyValueMemory` — Named facts with key/content matching
+> - `WorkingMemory` — Ephemeral scratchpad (key-value, returns all in context)
+> - `EpisodicMemory` — Temporal episodes with importance scoring and time-range filtering
+> - `GraphMemory` — Entity-relationship triples with indexed querying
+> - `CompositeMemory` — Multi-backend routing with dedup and per-memory token budgets
+> - `SelfEditingMemory` — MemGPT-style core + archival memory with 5 agent tools (core_memory_read/write/replace, archival_memory_search/insert)
+> - `FileMemory` — Disk-persisted per-entry JSON files with Component lifecycle and namespace scoping
+>
+> **Policies (`memory/policies.ts`)**:
+> - `importanceScore()`, `decayScore()` (exponential half-life), `combinedRelevance()` (weighted blend), `summarizeOldMemories()` (compress old entries)
+>
+> **Wiring**:
+> - Builder: `.memoryManager(manager)` method, auto-registers memory tools into ToolRegistry
+> - Runtime: Memory injection before loop, `onRunStart`/`onRunEnd`/`onRunError` hooks
+> - Barrel exports in `src/memory/index.ts` and `src/index.ts`
+>
+> **Tests**: 73 new tests (273 total across 10 files — all passing)
+> - MemoryEntry: creation, toDict/fromDict roundtrip
+> - ConversationMemory: add/get, eviction, search, context, delete, clear
+> - KeyValueMemory: set/get, update, search with key boost, context
+> - WorkingMemory: write/read, context (all entries), clear
+> - EpisodicMemory: record/recall, importance ranking, time filtering, eviction, Episode roundtrip
+> - GraphMemory: entities/relations, triple query, content parsing, metadata, Triple roundtrip, context
+> - CompositeMemory: route to all, memory_targets, merged search, dedup, sub-memory access, count
+> - SelfEditingMemory: tools list, core write/read/replace, char limit, archival insert/search, context
+> - VectorMemory: add/search, batch add, delete/clear, context with relevance
+> - FileMemory: add/retrieve, survive restart, keyword search, delete, clear, namespace scoping
+> - Strategies: DefaultInjection, UserMessageInjection, NoInjection, DefaultSave, SaveEverything, PerIteration, NoSave, DefaultQuery, KeywordQuery, AdaptiveTokenQuery
+> - MemoryManager: tools, inject, Component delegation, tool execution, onRunEnd
+> - Policies: importanceScore, decayScore, combinedRelevance
+>
+> **Build**: ESM + CJS + DTS output. Type-checking passes.
+>
+> **Post-completion fixes (strategy signatures & tests)**:
+> - `memory/strategies.ts`: `NoInjection.inject()` updated to implement `MemoryInjectionStrategy` with full signature `inject(_state, _memory, _query)` (was previously no-arg).
+> - `tests/unit/memory.test.ts`: NoSave test casts to `MemorySaveStrategy` when asserting `onRunEnd` is undefined (NoSave does not declare the optional property). DefaultQuery test calls `buildQuery("hello world")` and `maxTokens()` with no extra args to match implementations. KeywordQuery test calls `buildQuery("...")` with one argument only. All 73 memory tests pass; linter clean.
 
 ### 9.1 Memory Interface
-- [ ] `memory/base.ts`:
+- [x] `memory/base.ts`:
   ```typescript
   interface MemoryEntry {
     id: string;
@@ -857,7 +916,7 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
   ```
 
 ### 9.2 Memory Manager
-- [ ] `memory/manager.ts`:
+- [x] `memory/manager.ts`:
   - Pluggable strategies (injection, save, query)
   - Lifecycle management (inject on run start, save on run end)
   ```typescript
@@ -878,15 +937,15 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
   ```
 
 ### 9.3 Memory Implementations (9 backends)
-- [ ] `memory/conversation.ts` — Sliding window (last N messages)
-- [ ] `memory/vector.ts` — Semantic search via embeddings (cosine similarity)
-- [ ] `memory/key-value.ts` — Key-value store
-- [ ] `memory/composite.ts` — Combine multiple backends with namespace support
-- [ ] `memory/working.ts` — Ephemeral scratchpad (per-run)
-- [ ] `memory/episodic.ts` — Temporal episodes with decay
-- [ ] `memory/graph.ts` — Entity-relationship knowledge graph (triples)
-- [ ] `memory/self-editing.ts` — MemGPT/Letta-style (core + archival)
-- [ ] `memory/file.ts` — File-based persistent memory (MEMORY.md style)
+- [x] `memory/conversation.ts` — Sliding window (last N messages)
+- [x] `memory/vector.ts` — Semantic search via embeddings (cosine similarity)
+- [x] `memory/key-value.ts` — Key-value store
+- [x] `memory/composite.ts` — Combine multiple backends with namespace support
+- [x] `memory/working.ts` — Ephemeral scratchpad (per-run)
+- [x] `memory/episodic.ts` — Temporal episodes with decay
+- [x] `memory/graph.ts` — Entity-relationship knowledge graph (triples)
+- [x] `memory/self-editing.ts` — MemGPT/Letta-style (core + archival)
+- [x] `memory/file.ts` — File-based persistent memory (MEMORY.md style)
 
 ---
 

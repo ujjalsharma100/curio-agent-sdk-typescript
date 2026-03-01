@@ -186,6 +186,49 @@ export type { TracingMiddlewareOptions, GuardrailsMiddlewareOptions, PrometheusE
 export type { TracingConsumerOptions, LoggingConsumerOptions } from "./middleware/index.js";
 export { DEFAULT_PRICING } from "./middleware/index.js";
 
+// ── Memory (also available as curio-agent-sdk/memory) ───────────────────────
+export { MemoryEntry } from "./memory/index.js";
+export type { Memory } from "./memory/index.js";
+export {
+  ConversationMemory,
+  VectorMemory,
+  KeyValueMemory,
+  CompositeMemory,
+  WorkingMemory,
+  EpisodicMemory,
+  Episode,
+  GraphMemory,
+  Triple,
+  SelfEditingMemory,
+  FileMemory,
+} from "./memory/index.js";
+export type { EmbeddingFn } from "./memory/index.js";
+export { MemoryManager } from "./memory/index.js";
+export type {
+  MemoryInjectionStrategy,
+  MemorySaveStrategy,
+  MemoryQueryStrategy,
+} from "./memory/index.js";
+export {
+  DefaultInjection,
+  UserMessageInjection,
+  NoInjection,
+  DefaultSave,
+  SaveEverythingStrategy,
+  SaveSummaryStrategy,
+  NoSave,
+  PerIterationSave,
+  DefaultQuery,
+  KeywordQuery,
+  AdaptiveTokenQuery,
+} from "./memory/index.js";
+export {
+  importanceScore,
+  decayScore,
+  combinedRelevance,
+  summarizeOldMemories,
+} from "./memory/index.js";
+
 // ── Utilities ────────────────────────────────────────────────────────────────
 export {
   sleep,
