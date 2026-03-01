@@ -150,7 +150,7 @@ export type { RouterConfig, TierConfig, DegradationStrategy } from "./core/llm/i
 export { countStringTokens, countMessageTokens, clearTokenCache } from "./core/llm/index.js";
 
 // ── Core: Loops ──────────────────────────────────────────────────────────────
-export type { AgentLoop } from "./core/loops/index.js";
+export type { AgentLoop, ToolCallingLoopOptions } from "./core/loops/index.js";
 export { ToolCallingLoop } from "./core/loops/index.js";
 
 // ── Core: State ──────────────────────────────────────────────────────────────

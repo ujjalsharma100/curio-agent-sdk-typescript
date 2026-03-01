@@ -697,24 +697,31 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
 ---
 
 <a id="phase-5"></a>
-## Phase 5: Agent Loop
+## Phase 5: Agent Loop ✅ COMPLETED
+
+> **Completed on**: 2026-03-02
+>
+> **What was implemented**:
+> - **Loop interface** (`core/loops/base.ts`): `AgentLoop` with `step()`, `shouldContinue()`, and optional `streamStep()` for streaming.
+> - **Tool calling loop** (`core/loops/tool-calling.ts`): Standard pattern (Call LLM → parse tool calls → execute → loop), **parallel tool execution** via `ToolCallingLoopOptions.parallelToolCalls` and `ToolExecutor.executeParallel()`, **max iterations** enforced in `shouldContinue()`, **structured output** via `responseFormat` when no tools are registered, **stream delegation** via `streamStep()` (yields `text_delta`, `tool_call_start`/`tool_call_end`, `thinking`, `iteration_end` as the LLM streams and tools run), hook emission (iteration.before/after, llm.call.before/after/error, tool lifecycle in executor). Runtime uses `streamStep()` when available for real-time events during streaming.
 
 ### 5.1 Loop Interface
-- [ ] `core/loops/base.ts`:
+- [x] `core/loops/base.ts`:
   ```typescript
   interface AgentLoop {
     step(state: AgentState): Promise<AgentState>;
     shouldContinue(state: AgentState): boolean;
+    streamStep?(state: AgentState): AsyncIterableIterator<StreamEvent>;
   }
   ```
 
 ### 5.2 Tool Calling Loop
-- [ ] `core/loops/tool-calling.ts`:
+- [x] `core/loops/tool-calling.ts`:
   - Standard pattern: Call LLM → parse tool calls → execute → loop
   - Parallel tool execution
   - Max iterations enforcement
-  - Structured output support (Zod models)
-  - Stream delegation (yield events during execution)
+  - Structured output support (responseFormat when no tools)
+  - Stream delegation (yield events during execution via streamStep)
   - Hook emission (iteration.before/after)
 
 ---

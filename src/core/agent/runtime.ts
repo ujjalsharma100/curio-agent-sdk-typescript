@@ -171,39 +171,47 @@ export class Runtime {
     );
 
     try {
+      const useStreamStep = typeof this.config.loop.streamStep === "function";
+
       while (this.config.loop.shouldContinue(state)) {
         yield { type: "iteration_start", iteration: state.iteration };
 
-        await this.config.loop.step(state);
+        if (useStreamStep) {
+          for await (const event of this.config.loop.streamStep!(state)) {
+            yield event;
+          }
+        } else {
+          await this.config.loop.step(state);
 
-        // Yield text delta if there's new content from the last assistant message
-        const lastMsg = state.messages[state.messages.length - 1];
-        if (lastMsg?.role === "assistant" && typeof lastMsg.content === "string" && lastMsg.content) {
-          yield { type: "text_delta", text: lastMsg.content };
+          // Yield text delta if there's new content from the last assistant message
+          const lastMsg = state.messages[state.messages.length - 1];
+          if (lastMsg?.role === "assistant" && typeof lastMsg.content === "string" && lastMsg.content) {
+            yield { type: "text_delta", text: lastMsg.content };
+          }
+
+          // Yield tool call events from the current iteration's tool call records
+          const currentIterRecords = state.toolCallRecords.filter(
+            (r) => r.iteration === state.iteration - 1,
+          );
+          for (const record of currentIterRecords) {
+            yield {
+              type: "tool_call_start",
+              toolName: record.toolName,
+              toolCallId: `tc_${record.toolName}_${state.iteration}`,
+              arguments: record.arguments,
+            };
+            yield {
+              type: "tool_call_end",
+              toolName: record.toolName,
+              toolCallId: `tc_${record.toolName}_${state.iteration}`,
+              result: record.result,
+              error: record.error,
+              duration: record.duration,
+            };
+          }
+
+          yield { type: "iteration_end", iteration: state.iteration - 1 };
         }
-
-        // Yield tool call events from the current iteration's tool call records
-        const currentIterRecords = state.toolCallRecords.filter(
-          (r) => r.iteration === state.iteration - 1,
-        );
-        for (const record of currentIterRecords) {
-          yield {
-            type: "tool_call_start",
-            toolName: record.toolName,
-            toolCallId: `tc_${record.toolName}_${state.iteration}`,
-            arguments: record.arguments,
-          };
-          yield {
-            type: "tool_call_end",
-            toolName: record.toolName,
-            toolCallId: `tc_${record.toolName}_${state.iteration}`,
-            result: record.result,
-            error: record.error,
-            duration: record.duration,
-          };
-        }
-
-        yield { type: "iteration_end", iteration: state.iteration - 1 };
       }
 
       // Handle max iterations
