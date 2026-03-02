@@ -1299,23 +1299,104 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
 ---
 
 <a id="phase-15"></a>
-## Phase 15: Built-in Tools
+## Phase 15: Built-in Tools ✅ COMPLETED
+
+> **Completed on**: 2026-03-03  
+> **What was implemented**:
+> - A set of reusable, configurable built-in tools under `src/tools/` with a public surface exported from `src/index.ts`.
+> - Tools use the existing `createTool()` abstraction, Zod schemas for parameters, and return structured JSON strings so the agent can reliably parse results.
+> - Shell/code execution tools are sandboxed via `child_process.execFile` (no `shell: true`), conservative environment forwarding, explicit timeouts, and buffer limits.
+> - Network and file tools are designed to work seamlessly with the existing `PermissionPolicy`, `FileSandboxPolicy`, and `NetworkSandboxPolicy` by using `url`/`path`-style argument keys.
+>
+> **Files created**:
+> - `src/tools/web-fetch.ts` — `createWebFetchTool`, `webFetchTool`
+> - `src/tools/http-request.ts` — `createHttpRequestTool`, `httpRequestTool`
+> - `src/tools/file-read.ts` — `createFileReadTool`, `fileReadTool`
+> - `src/tools/file-write.ts` — `createFileWriteTool`, `fileWriteTool`
+> - `src/tools/code-execute.ts` — `createCodeExecuteTool`, `codeExecuteTool`
+> - `src/tools/shell-execute.ts` — `createShellExecuteTool`, `shellExecuteTool`
+> - `src/tools/computer-use.ts` — `createComputerUseTool`, `computerUseTool`
+> - `src/tools/browser.ts` — `createBrowserTool`, `browserTool`
+> - `src/tools/index.ts` — Barrel exports for all built-in tools and their option types.
+> - `src/index.ts` — New **Built-in Tools** section exporting the above factories and default tool instances.
+>
+> **Tool behaviors**:
+> - **Web fetch (`web_fetch`)** (`tools/web-fetch.ts`):
+>   - Parameters: `{ url, method?: "GET" | "HEAD", headers?: Record<string,string>, timeoutMs?, maxBytes? }`.
+>   - Uses native `fetch` with `AbortController` for per-call timeouts.
+>   - Converts HTML responses to markdown via a lightweight HTML-to-markdown helper (headings, paragraphs, lists, links, bold/italic, script/style stripping).
+>   - Returns JSON: `{ url, method, status, statusText, contentType, headers, markdown, truncated, bytes }`.
+>   - Marked `idempotent: true` with a slightly higher executor timeout than the internal fetch timeout.
+> - **HTTP request (`http_request`)** (`tools/http-request.ts`):
+>   - Parameters: `{ url, method, headers?, body?, timeoutMs?, maxBytes? }`.
+>   - Handles all common HTTP verbs with optional body for non-GET/HEAD methods.
+>   - Detects JSON responses (`content-type` containing `application/json`) and parses into a `json` field in addition to `bodyText`.
+>   - Returns JSON: `{ url, method, status, statusText, contentType, headers, bodyText, json, truncated, bytes }`.
+> - **File read (`file_read`)** (`tools/file-read.ts`):
+>   - `FileReadToolOptions`: `{ baseDir?, defaultEncoding?, defaultMaxBytes? }`.
+>   - Parameters: `{ path, encoding?: "utf-8" | "utf8" | "base64", maxBytes? }`.
+>   - Resolves paths relative to `baseDir` when provided, otherwise via `path.resolve()`.
+>   - Reads up to `maxBytes` (default 512 KiB), supports `utf-8` or `base64` encodings.
+>   - Returns JSON: `{ path, resolvedPath, encoding, content, truncated, bytes }` or `{ ..., error }` on failure.
+>   - Marked `idempotent: true`.
+> - **File write (`file_write`)** (`tools/file-write.ts`):
+>   - `FileWriteToolOptions`: `{ baseDir?, defaultEncoding? }`.
+>   - Parameters: `{ path, content, encoding?: "utf-8" | "utf8", overwrite?: boolean }`.
+>   - Ensures parent directories exist (`fs.mkdir(..., { recursive: true })`).
+>   - By default refuses to overwrite existing files unless `overwrite: true` is set.
+>   - Returns JSON: `{ path, resolvedPath, bytesWritten, overwritten }` or `{ ..., error }` on failure.
+>   - Tool name includes `"write"`, so `AllowReadsAskWrites` policies naturally require confirmation.
+> - **Code execute (`code_execute`)** (`tools/code-execute.ts`):
+>   - `CodeExecuteToolOptions`: `{ cwd?, defaultTimeoutMs?, defaultMaxBufferBytes?, extraEnv?, allowedEnvVars? }`.
+>   - Parameters: `{ language: "javascript", code, timeoutMs?, maxBufferBytes? }`.
+>   - Current implementation supports JavaScript only, executed via `node -e "<code>"` using `execFile` (no shell).
+>   - Sandboxing:
+>     - Default timeout 20s (config timeout slightly higher).
+>     - Default `maxBuffer` 10 MiB for combined stdout/stderr.
+>     - Restricted environment: forwards only a conservative allowlist (`PATH`, `HOME`, `LANG`, `LC_ALL`, `TMPDIR`, `TEMP`, `TMP`) plus any `extraEnv`.
+>     - Optional `cwd` in options (not controlled by tool arguments) to confine the working directory.
+>   - Returns JSON: `{ language, stdout, stderr, exitCode, timedOut, signal? }`; unsupported languages yield a structured error.
+> - **Shell execute (`shell_execute`)** (`tools/shell-execute.ts`):
+>   - `ShellExecuteToolOptions`: `{ cwd?, defaultTimeoutMs?, defaultMaxBufferBytes?, extraEnv?, allowedEnvVars? }`.
+>   - Parameters: `{ command, args?: string[], timeoutMs?, maxBufferBytes? }`.
+>   - Uses `execFile(command, args, ...)` with `shell: false` semantics (no pipes or redirection), avoiding shell injection.
+>   - Same timeout, buffer, and restricted-env model as `code_execute`, with options controlling `cwd` and allowable env vars.
+>   - Returns JSON: `{ command, args, stdout, stderr, exitCode, timedOut, signal? }`.
+>   - Tool name (`shell_execute`) triggers `AllowReadsAskWrites` confirmation heuristics.
+> - **Computer use (`computer_use`)** (`tools/computer-use.ts`):
+>   - `ComputerUseToolOptions`: `{ enabled?: boolean }`.
+>   - Parameters: `{ instruction: string }` — natural language description of the desired GUI action.
+>   - Currently implemented as a **safe placeholder** that does not perform any real GUI automation (no robotjs/nut.js dependency).
+>   - Returns JSON: `{ success: false, enabled, message, requestedInstruction }`, making the limitation explicit while preserving API parity with the Python SDK.
+> - **Browser navigation (`browser_navigate`)** (`tools/browser.ts`):
+>   - `BrowserToolOptions`: `{ browser?: "chromium" | "firefox" | "webkit", defaultTimeoutMs? }`.
+>   - Parameters: `{ url, waitUntil?: "load" | "domcontentloaded" | "networkidle", timeoutMs? }`.
+>   - Lazily imports the optional `playwright` dependency at runtime; if unavailable, returns a structured error instead of throwing.
+>   - Launches the configured browser type, opens a new context/page, navigates to the URL with the requested `waitUntil`, and then returns JSON: `{ url, title, html }`.
+>   - Ensures the browser is closed in a `finally` block to avoid resource leaks.
+>
+> **Public exports**:
+> - `src/tools/index.ts` — exports all factory functions and default tool instances, plus option types.
+> - `src/index.ts` — new **Built-in Tools** section:
+>   - Functions: `createWebFetchTool`, `createHttpRequestTool`, `createFileReadTool`, `createFileWriteTool`, `createCodeExecuteTool`, `createShellExecuteTool`, `createComputerUseTool`, `createBrowserTool`.
+>   - Default tools: `webFetchTool`, `httpRequestTool`, `fileReadTool`, `fileWriteTool`, `codeExecuteTool`, `shellExecuteTool`, `computerUseTool`, `browserTool`.
+>   - Types: `WebFetchToolOptions`, `HttpRequestToolOptions`, `FileReadToolOptions`, `FileWriteToolOptions`, `CodeExecuteToolOptions`, `ShellExecuteToolOptions`, `ComputerUseToolOptions`, `BrowserToolOptions`.
 
 ### 15.1 Tool Implementations
-- [ ] `tools/web-fetch.ts` — Fetch URL, convert HTML to markdown
-- [ ] `tools/code-execute.ts` — Execute code (sandboxed subprocess)
-- [ ] `tools/shell-execute.ts` — Execute shell commands (sandboxed)
-- [ ] `tools/file-read.ts` — Read file contents
-- [ ] `tools/file-write.ts` — Write file contents
-- [ ] `tools/http-request.ts` — Generic HTTP requests
-- [ ] `tools/computer-use.ts` — GUI automation (optional, robotjs/nut.js)
-- [ ] `tools/browser.ts` — Browser automation (Playwright)
+- [x] `tools/web-fetch.ts` — Fetch URL, convert HTML to markdown
+- [x] `tools/code-execute.ts` — Execute code (sandboxed subprocess)
+- [x] `tools/shell-execute.ts` — Execute shell commands (sandboxed)
+- [x] `tools/file-read.ts` — Read file contents
+- [x] `tools/file-write.ts` — Write file contents
+- [x] `tools/http-request.ts` — Generic HTTP requests
+- [x] `tools/computer-use.ts` — GUI automation (optional, robotjs/nut.js-compatible placeholder)
+- [x] `tools/browser.ts` — Browser automation (Playwright)
 
 ### 15.2 Sandboxing
-- [ ] Resource limits via `child_process` options (timeout, maxBuffer)
-- [ ] Restricted environment variables
-- [ ] Working directory confinement
-- [ ] No shell injection (exec, not shell=true)
+- [x] Resource limits via `child_process` options (timeout, maxBuffer) — `code_execute` and `shell_execute` use `execFile` with configurable `timeout` and `maxBuffer` defaults.
+- [x] Restricted environment variables — both subprocess tools forward only an allowlisted subset of `process.env` plus explicit `extraEnv`.
+- [x] Working directory confinement — subprocess tools take `cwd` via options (not tool arguments) so calling code can pin execution to a safe directory.
+- [x] No shell injection (exec, not shell=true) — both subprocess tools use `execFile` (no shell) and require explicit `command`/`args` instead of full shell command lines.
 
 ---
 

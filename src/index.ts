@@ -312,3 +312,33 @@ export {
   generateShortId,
   createLogger,
 } from "./utils/index.js";
+
+// ── Built-in Tools ────────────────────────────────────────────────────────────
+export {
+  createWebFetchTool,
+  webFetchTool,
+  createCodeExecuteTool,
+  codeExecuteTool,
+  createShellExecuteTool,
+  shellExecuteTool,
+  createFileReadTool,
+  fileReadTool,
+  createFileWriteTool,
+  fileWriteTool,
+  createHttpRequestTool,
+  httpRequestTool,
+  createComputerUseTool,
+  computerUseTool,
+  createBrowserTool,
+  browserTool,
+} from "./tools/index.js";
+export type {
+  WebFetchToolOptions,
+  CodeExecuteToolOptions,
+  ShellExecuteToolOptions,
+  FileReadToolOptions,
+  FileWriteToolOptions,
+  HttpRequestToolOptions,
+  ComputerUseToolOptions,
+  BrowserToolOptions,
+} from "./tools/index.js";
