@@ -22,6 +22,10 @@ import type { MemoryManager } from "../../memory/manager.js";
 import type { ContextManager } from "../context/context.js";
 import type { PermissionPolicy } from "../security/permissions.js";
 import type { HumanInputHandler } from "../security/human-input.js";
+import type { Skill } from "../extensions/skills.js";
+import { PluginRegistry } from "../extensions/plugins.js";
+import type { Plugin } from "../extensions/plugins.js";
+import type { SubagentConfig } from "../extensions/subagent.js";
 import { Tool } from "../tools/tool.js";
 import { ToolRegistry } from "../tools/registry.js";
 import { ToolExecutor } from "../tools/executor.js";
@@ -54,6 +58,9 @@ export interface AgentConfig {
   contextManager?: ContextManager;
   permissionPolicy?: PermissionPolicy;
   humanInput?: HumanInputHandler;
+  skills: Skill[];
+  plugins: Plugin[];
+  subagents: Record<string, SubagentConfig>;
 }
 
 export class AgentBuilder {
@@ -68,6 +75,9 @@ export class AgentBuilder {
     agentId: generateShortId(),
     agentName: "curio-agent",
     metadata: {},
+    skills: [],
+    plugins: [],
+    subagents: {},
   };
 
   /** Set the model (e.g., "anthropic:claude-sonnet-4-6", "openai:gpt-4o"). */
@@ -109,6 +119,61 @@ export class AgentBuilder {
   /** Register a hook handler. */
   hook(event: string, handler: HookHandler, priority?: number): this {
     this.config.hooks.push({ event, handler, priority });
+    return this;
+  }
+
+  /**
+   * Attach a skill to this agent. Skills can contribute system prompts, tools,
+   * and hooks in a single reusable bundle.
+   */
+  skill(skill: Skill): this {
+    this.config.skills.push(skill);
+
+    // Merge skill system prompt into the existing system prompt, preserving
+    // dynamic system prompt functions when present.
+    if (skill.systemPrompt) {
+      const existing = this.config.systemPrompt;
+      if (typeof existing === "function") {
+        const fn = existing;
+        this.config.systemPrompt = () => `${fn()}\n\n${skill.systemPrompt}`;
+      } else if (existing) {
+        this.config.systemPrompt = `${existing}\n\n${skill.systemPrompt}`;
+      } else {
+        this.config.systemPrompt = skill.systemPrompt;
+      }
+    }
+
+    // Merge skill tools.
+    if (skill.tools.length > 0) {
+      this.config.tools.push(...skill.tools);
+    }
+
+    // Merge skill hooks.
+    for (const h of skill.hooks) {
+      this.config.hooks.push({
+        event: h.event,
+        handler: h.handler,
+        priority: h.priority,
+      });
+    }
+
+    return this;
+  }
+
+  /** Register a plugin that can modify the builder configuration before build(). */
+  plugin(plugin: Plugin): this {
+    this.config.plugins.push(plugin);
+    return this;
+  }
+
+  /**
+   * Register a named subagent configuration.
+   *
+   * Subagents are child agents with their own system prompt and (optionally)
+   * distinct tools, models, and run limits.
+   */
+  subagent(name: string, config: SubagentConfig): this {
+    this.config.subagents[name] = config;
     return this;
   }
 
@@ -198,6 +263,16 @@ export class AgentBuilder {
 
   /** Build the agent. Requires at minimum a model and an LLM client. */
   build(): Agent {
+    // Apply plugins first so they can mutate the builder configuration
+    // (e.g., add tools, middleware, or skills) before we construct registries.
+    if (this.config.plugins.length > 0) {
+      const registry = new PluginRegistry();
+      for (const plugin of this.config.plugins) {
+        registry.register(plugin);
+      }
+      registry.applyAll(this);
+    }
+
     // Build tool registry
     const toolRegistry = new ToolRegistry();
     for (const tool of this.config.tools) {
@@ -260,6 +335,60 @@ export class AgentBuilder {
       memoryManager: this.config.memoryManager,
     });
 
+    // Build subagents, which share the same hook registry, state store, and
+    // memory manager, but can customize model, tools, and prompts.
+    const subagentMap = new Map<string, Agent>();
+    const parentTimeout = this.config.timeout;
+    const parentMaxIterations = this.config.maxIterations;
+
+    for (const [name, subConfig] of Object.entries(this.config.subagents)) {
+      const subToolRegistry = new ToolRegistry();
+      const tools = subConfig.tools && subConfig.tools.length > 0 ? subConfig.tools : this.config.tools;
+      for (const t of tools) {
+        subToolRegistry.register(t);
+      }
+
+      const subToolExecutor = new ToolExecutor(subToolRegistry, {
+        hookRegistry,
+        middlewarePipeline: this.config.middleware.length > 0 ? pipeline : undefined,
+        permissionPolicy: this.config.permissionPolicy,
+        humanInput: this.config.humanInput,
+      });
+
+      const subLoop =
+        this.config.loop ??
+        new ToolCallingLoop(llmClient, subToolExecutor, hookRegistry, {
+          contextManager: this.config.contextManager,
+        });
+
+      const subRuntime = new Runtime({
+        loop: subLoop,
+        hooks: hookRegistry,
+        toolRegistry: subToolRegistry,
+        model: subConfig.model ?? this.config.model,
+        systemPrompt: subConfig.systemPrompt,
+        maxIterations: subConfig.maxIterations ?? parentMaxIterations,
+        timeout: subConfig.timeout ?? parentTimeout,
+        agentId: `${this.config.agentId}:${name}`,
+        stateStore: this.config.stateStore,
+        memoryManager: this.config.memoryManager,
+      });
+
+      const subAgent = new Agent({
+        runtime: subRuntime,
+        agentId: `${this.config.agentId}:${name}`,
+        agentName: `${this.config.agentName}/${name}`,
+        model: subConfig.model ?? this.config.model,
+        toolRegistry: subToolRegistry,
+        hookRegistry,
+        metadata: { ...this.config.metadata, subagent: name },
+        sessionManager: this.config.sessionManager,
+        subagents: new Map(), // subagents of subagents can be added later if desired
+      });
+
+      subagentMap.set(name, subAgent);
+    }
+
     return new Agent({
       runtime,
       agentId: this.config.agentId,
@@ -269,6 +398,7 @@ export class AgentBuilder {
       hookRegistry,
       metadata: this.config.metadata,
       sessionManager: this.config.sessionManager,
+      subagents: subagentMap,
     });
   }
 }

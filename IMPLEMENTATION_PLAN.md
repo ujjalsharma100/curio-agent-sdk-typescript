@@ -1131,36 +1131,62 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
 ---
 
 <a id="phase-12"></a>
-## Phase 12: Extensions (Skills, Plugins, Subagents)
+## Phase 12: Extensions (Skills, Plugins, Subagents) ✅ COMPLETED
+
+> **Completed on**: 2026-03-02
+>
+> **What was implemented**:
+> - **Skills (`core/extensions/skills.ts`)**:
+>   - `Skill` class bundling name, description, `systemPrompt`, tools, hooks, and free-form `instructions` markdown.
+>   - `Skill.fromDirectory(path)` loads a skill from a filesystem directory containing a YAML/JSON manifest (`skill.yaml` / `skill.yml` / `skill.json`) and optional instructions file (`SKILL.md` / `README.md`).
+>   - YAML manifest parsing via the `yaml` npm package with a `SkillManifest` type describing the on-disk format.
+>   - `SkillRegistry` — in-memory registry with `register`, `unregister`, `list`, `get`, `activate`, `deactivate`, `isActive`, `getActiveSkills`, and `clear`.
+> - **Plugins (`core/extensions/plugins.ts`)**:
+>   - `Plugin` interface with `name` and `register(builder: AgentBuilder)`; plugins can mutate the builder configuration before `build()`.
+>   - `PluginRegistry` — register/unregister/get/list plus `applyAll(builder)` to invoke all registered plugins on a builder.
+>   - `discoverPluginsFromPackageJson()` helper scans the current project's `package.json` for dependencies starting with `curio-plugin-`, dynamically imports each package, and treats any exported object with a compatible shape as a plugin (best-effort discovery).
+> - **Subagents (`core/extensions/subagent.ts`, `core/agent/builder.ts`, `core/agent/agent.ts`)**:
+>   - `SubagentConfig` type in `core/extensions/subagent.ts`:
+>     ```typescript
+>     interface SubagentConfig {
+>       systemPrompt: string;
+>       tools?: Tool[];
+>       model?: string;
+>       maxIterations?: number;
+>       timeout?: number;
+>     }
+>     ```
+>   - `AgentBuilder.subagent(name, config)` registers named subagents on the builder; they are materialized as full `Agent` instances during `build()`, sharing the parent hooks, middleware, state store, and memory manager but with their own system prompt, model, tools, and run limits.
+>   - `Agent` now keeps a `subagents` map and exposes:
+>     - `spawnSubagent(name, input, options?) => Promise<AgentRunResult>`
+>     - `spawnSubagentStream(name, input, options?) => AsyncIterableIterator<StreamEvent>`
+>   - Subagents use their own `ToolRegistry`/`ToolExecutor` and `Runtime`, while reusing the same underlying LLM client and hook registry as the parent agent.
+> - **Builder integration (`core/agent/builder.ts`)**:
+>   - `.skill(skill: Skill)` — attaches a skill to the agent, merging its `systemPrompt`, tools, and hooks into the builder configuration.
+>   - `.plugin(plugin: Plugin)` — registers a plugin; plugins are applied once at build time via an internal `PluginRegistry` before registries and runtime are constructed.
+>   - `.subagent(name: string, config: SubagentConfig)` — registers named subagents as described above.
+> - **Public API exports**:
+>   - `src/core/extensions/index.ts` — barrel exports for `Skill`, `SkillRegistry`, `PluginRegistry`, `isPlugin`, `discoverPluginsFromPackageJson`, and `SubagentConfig`.
+>   - `src/index.ts` — re-exports core extensions types and utilities, and now exports `SubagentConfig` from the extensions layer instead of `models/agent.ts` (which previously contained a placeholder type).
 
 ### 12.1 Skills
-- [ ] `core/extensions/skills.ts`:
+- [x] `core/extensions/skills.ts`:
   - `Skill` class with name, description, systemPrompt, tools, hooks, instructions
   - `Skill.fromDirectory(path)` — load from directory
-  - YAML manifest parsing
+  - YAML/JSON manifest parsing
   - `SkillRegistry` — register, activate, deactivate, list
 
 ### 12.2 Plugins
-- [ ] `core/extensions/plugins.ts`:
+- [x] `core/extensions/plugins.ts`:
   - `Plugin` interface with `register(builder: AgentBuilder)`
   - npm package discovery (`curio-plugin-*`)
   - `PluginRegistry` — register, discover, list
 
 ### 12.3 Subagents
-- [ ] `core/extensions/subagent.ts`:
-  ```typescript
-  interface SubagentConfig {
-    systemPrompt: string;
-    tools?: Tool[];
-    model?: string;
-    maxIterations?: number;
-    timeout?: number;
-  }
-
-  // Spawn methods on Agent:
-  // agent.spawnSubagent(name: string, input: string): Promise<AgentRunResult>
-  // agent.spawnSubagentStream(name: string, input: string): AsyncIterableIterator<StreamEvent>
-  ```
+- [x] `core/extensions/subagent.ts` and Agent wiring:
+  - `SubagentConfig` type describing subagent model/tools/prompts/limits
+  - `AgentBuilder.subagent(name, config)` for registration
+  - `Agent.spawnSubagent(name, input)` and `Agent.spawnSubagentStream(name, input)` methods
 
 ---
 

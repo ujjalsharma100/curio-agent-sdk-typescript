@@ -65,8 +65,9 @@ export type {
   AgentMetrics,
   RunOptions,
   AgentIdentity,
-  SubagentConfig,
 } from "./models/index.js";
+
+export type { SubagentConfig } from "./core/extensions/index.js";
 
 export { emptyMetrics } from "./models/index.js";
 
@@ -205,6 +206,16 @@ export {
   collectUrlsFromArgs,
   CLIHumanInput,
 } from "./core/security/index.js";
+
+// ── Core: Extensions (Skills, Plugins, Subagents) ──────────────────────────
+export {
+  Skill,
+  SkillRegistry,
+  PluginRegistry,
+  isPlugin,
+  discoverPluginsFromPackageJson,
+} from "./core/extensions/index.js";
+export type { SkillOptions, SkillManifest, SkillDirectoryOptions, SkillHookDefinition } from "./core/extensions/index.js";
 
 // ── Middleware (also available as curio-agent-sdk/middleware) ──────────────────
 export type { Middleware } from "./middleware/base.js";

@@ -38,6 +38,7 @@ export interface AgentParams {
   hookRegistry: HookRegistry;
   metadata?: Record<string, unknown>;
   sessionManager?: SessionManager;
+  subagents?: Map<string, Agent>;
 }
 
 export class Agent {
@@ -54,6 +55,7 @@ export class Agent {
   private readonly _hookRegistry: HookRegistry;
   private readonly _metadata: Record<string, unknown>;
   private readonly _sessionManager?: SessionManager;
+  private readonly _subagents: Map<string, Agent>;
   private _closed = false;
 
   constructor(params: AgentParams) {
@@ -65,6 +67,7 @@ export class Agent {
     this._hookRegistry = params.hookRegistry;
     this._metadata = params.metadata ?? {};
     this._sessionManager = params.sessionManager;
+    this._subagents = params.subagents ?? new Map<string, Agent>();
   }
 
   // ── Static builder ───────────────────────────────────────────────────────
@@ -94,6 +97,11 @@ export class Agent {
   /** Get agent metadata. */
   get metadata(): Record<string, unknown> {
     return { ...this._metadata };
+  }
+
+  /** Get a read-only view of registered subagents. */
+  get subagents(): ReadonlyMap<string, Agent> {
+    return this._subagents;
   }
 
   /** Whether this agent has been closed. */
@@ -158,6 +166,45 @@ export class Agent {
     this.ensureNotClosed();
     const state = this.runtime.createState(input, options);
     yield* this.runtime.streamWithState(state);
+  }
+
+  // ── Subagents ──────────────────────────────────────────────────────────────
+
+  /**
+   * Spawn a named subagent and run it to completion.
+   *
+   * Subagents are built at agent construction time from the registered
+   * SubagentConfig entries on the builder. They share the same underlying
+   * hooks, middleware, and (by default) model, but can have distinct system
+   * prompts and tools.
+   */
+  async spawnSubagent(
+    name: string,
+    input: string,
+    options?: RunOptions,
+  ): Promise<AgentRunResult> {
+    this.ensureNotClosed();
+    const subagent = this._subagents.get(name);
+    if (!subagent) {
+      throw new Error(`Subagent "${name}" is not registered on this agent`);
+    }
+    return subagent.arun(input, options);
+  }
+
+  /**
+   * Spawn a named subagent and stream events as they occur.
+   */
+  async *spawnSubagentStream(
+    name: string,
+    input: string,
+    options?: RunOptions,
+  ): AsyncIterableIterator<StreamEvent> {
+    this.ensureNotClosed();
+    const subagent = this._subagents.get(name);
+    if (!subagent) {
+      throw new Error(`Subagent "${name}" is not registered on this agent`);
+    }
+    yield* subagent.astream(input, options);
   }
 
   // ── Lifecycle ────────────────────────────────────────────────────────────

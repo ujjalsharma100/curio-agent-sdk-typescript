@@ -106,20 +106,5 @@ export interface AgentIdentity {
   agentName: string;
 }
 
-// ---------------------------------------------------------------------------
-// Subagent configuration
-// ---------------------------------------------------------------------------
-
-/** Configuration for spawning a subagent. */
-export interface SubagentConfig {
-  /** System prompt for the subagent. */
-  systemPrompt: string;
-  /** Tools available to the subagent. */
-  tools?: ToolCall[];
-  /** Model to use (defaults to parent's tier-1 model). */
-  model?: string;
-  /** Max iterations for the subagent. */
-  maxIterations?: number;
-  /** Timeout in milliseconds. */
-  timeout?: number;
-}
+// (Subagent configuration now lives in core/extensions/subagent.ts and is
+// re-exported via the core extensions barrel and top-level index.)

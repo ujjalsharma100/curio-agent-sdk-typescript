@@ -24,7 +24,6 @@ export type {
   AgentMetrics,
   RunOptions,
   AgentIdentity,
-  SubagentConfig,
 } from "./agent.js";
 
 export { emptyMetrics } from "./agent.js";
