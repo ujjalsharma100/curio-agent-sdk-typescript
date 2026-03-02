@@ -188,6 +188,24 @@ export {
 } from "./core/context/index.js";
 export type { InstructionLoaderOptions } from "./core/context/index.js";
 
+// ── Core: Security & Permissions ────────────────────────────────────────────
+export type {
+  PermissionResult,
+  PermissionContext,
+  HumanInputHandler,
+} from "./core/security/index.js";
+export {
+  AllowAll,
+  AskAlways,
+  AllowReadsAskWrites,
+  CompoundPolicy,
+  FileSandboxPolicy,
+  NetworkSandboxPolicy,
+  collectPathsFromArgs,
+  collectUrlsFromArgs,
+  CLIHumanInput,
+} from "./core/security/index.js";
+
 // ── Middleware (also available as curio-agent-sdk/middleware) ──────────────────
 export type { Middleware } from "./middleware/base.js";
 export { MiddlewarePipeline } from "./middleware/base.js";

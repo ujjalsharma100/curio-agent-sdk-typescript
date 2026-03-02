@@ -8,37 +8,26 @@ import { sha256 } from "../../utils/hash.js";
 import { HookContext, HookEvent } from "../../models/events.js";
 import type { HookRegistry } from "../events/hooks.js";
 import type { MiddlewarePipeline } from "../../middleware/base.js";
+import type {
+  PermissionPolicy,
+  PermissionContext,
+  PermissionResult,
+} from "../security/permissions.js";
+import type { HumanInputHandler } from "../security/human-input.js";
 import { ToolRegistry } from "./registry.js";
 import type { Tool } from "./tool.js";
 
 // ---------------------------------------------------------------------------
-// Permission policy (Phase 11 will provide concrete implementations)
+// Permission types (Phase 11 concrete policies live in core/security)
 // ---------------------------------------------------------------------------
 
-/** Context passed to permission check. */
-export interface ToolPermissionContext {
-  runId?: string;
-  agentId?: string;
+/** Context passed from the ToolExecutor into PermissionPolicy.checkToolCall. */
+export interface ToolPermissionContext extends PermissionContext {
   toolCallId: string;
-  toolConfig?: Record<string, unknown>;
 }
 
-/** Result of a permission check. */
-export interface ToolPermissionResult {
-  allowed: boolean;
-  reason?: string;
-  /** If true, executor may prompt for user confirmation when humanInput is available. */
-  askUser?: boolean;
-}
-
-/** Policy for allowing or denying tool calls. Phase 11 implements full security. */
-export interface PermissionPolicy {
-  checkToolCall(
-    toolName: string,
-    args: Record<string, unknown>,
-    context: ToolPermissionContext,
-  ): Promise<ToolPermissionResult>;
-}
+/** Result of a permission check for a specific tool call. */
+export type ToolPermissionResult = PermissionResult;
 
 // ---------------------------------------------------------------------------
 // Run context (for hooks)
@@ -88,6 +77,12 @@ export interface ToolExecutorOptions {
   middlewarePipeline?: MiddlewarePipeline;
   /** Optional permission policy; when set, check before executing. */
   permissionPolicy?: PermissionPolicy;
+  /**
+   * Optional human input handler. When a permission policy returns
+   * `requireConfirmation: true`, this handler is used to ask the user
+   * whether the tool call should proceed.
+   */
+  humanInput?: HumanInputHandler;
 }
 
 // ---------------------------------------------------------------------------
@@ -109,7 +104,7 @@ export class ToolExecutor {
    * When options.permissionPolicy is set, checks permission before executing.
    */
   async executeTool(call: ToolCall, context?: ToolExecutorContext): Promise<ToolResult> {
-    const { hookRegistry, permissionPolicy, middlewarePipeline } = this.options;
+    const { hookRegistry, permissionPolicy, middlewarePipeline, humanInput } = this.options;
     let toolName = call.name;
     let args = { ...call.arguments };
     const runId = context?.runId ?? "";
@@ -164,33 +159,98 @@ export class ToolExecutor {
       args = (beforeCtx.data["args"] as Record<string, unknown>) ?? args;
     }
 
-    // Permission check
+    // Permission check (with optional human confirmation)
     if (permissionPolicy) {
-      const permResult = await permissionPolicy.checkToolCall(toolName, args, {
+      const permContext: ToolPermissionContext = {
         runId,
         agentId,
         toolCallId: call.id,
         toolConfig: tool.config as Record<string, unknown>,
-      });
-      if (!permResult.allowed) {
-        const errResult: ToolResult = {
+      };
+      const permResult = await permissionPolicy.checkToolCall(toolName, args, permContext);
+
+      // If the policy denies outright (and does not ask for confirmation), fail fast.
+      if (!permResult.allowed && !permResult.requireConfirmation) {
+        const errorMessage = `Permission denied: ${permResult.reason ?? "not allowed"}`;
+        const deniedResult: ToolResult = {
           toolCallId: call.id,
-          toolName: toolName,
+          toolName,
           result: "",
-          error: `Permission denied: ${permResult.reason ?? "not allowed"}`,
+          error: errorMessage,
         };
         if (hookRegistry) {
           await hookRegistry.emit(
             HookEvent.TOOL_CALL_ERROR,
             new HookContext({
               event: HookEvent.TOOL_CALL_ERROR,
-              data: { toolName, args, error: errResult.error },
+              data: { toolName, args, error: errorMessage },
               runId,
               agentId,
             }),
           );
         }
-        return errResult;
+        return deniedResult;
+      }
+
+      // If confirmation is required, consult the human input handler when available.
+      if (permResult.requireConfirmation) {
+        if (!humanInput) {
+          const reason =
+            permResult.reason ??
+            "Permission requires confirmation, but no HumanInputHandler is configured";
+          const errResult: ToolResult = {
+            toolCallId: call.id,
+            toolName,
+            result: "",
+            error: `Permission denied: ${reason}`,
+          };
+          if (hookRegistry) {
+            await hookRegistry.emit(
+              HookEvent.TOOL_CALL_ERROR,
+              new HookContext({
+                event: HookEvent.TOOL_CALL_ERROR,
+                data: { toolName, args, error: errResult.error },
+                runId,
+                agentId,
+              }),
+            );
+          }
+          return errResult;
+        }
+
+        const promptLines = [
+          "--- Tool Confirmation Required ---",
+          `Tool: ${toolName}`,
+          `Args: ${JSON.stringify(args, null, 2)}`,
+          permResult.reason ? `Reason: ${permResult.reason}` : undefined,
+        ].filter((line) => line != null) as string[];
+
+        const allow = await humanInput.getUserConfirmation(promptLines.join("\n"), {
+          ...permContext,
+          toolName,
+          args,
+        });
+
+        if (!allow) {
+          const errResult: ToolResult = {
+            toolCallId: call.id,
+            toolName,
+            result: "",
+            error: "Permission denied by human operator",
+          };
+          if (hookRegistry) {
+            await hookRegistry.emit(
+              HookEvent.TOOL_CALL_ERROR,
+              new HookContext({
+                event: HookEvent.TOOL_CALL_ERROR,
+                data: { toolName, args, error: errResult.error },
+                runId,
+                agentId,
+              }),
+            );
+          }
+          return errResult;
+        }
       }
     }
 

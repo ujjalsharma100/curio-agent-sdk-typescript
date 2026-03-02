@@ -20,6 +20,8 @@ import type { SessionManager } from "../state/session.js";
 import type { Middleware } from "../../middleware/base.js";
 import type { MemoryManager } from "../../memory/manager.js";
 import type { ContextManager } from "../context/context.js";
+import type { PermissionPolicy } from "../security/permissions.js";
+import type { HumanInputHandler } from "../security/human-input.js";
 import { Tool } from "../tools/tool.js";
 import { ToolRegistry } from "../tools/registry.js";
 import { ToolExecutor } from "../tools/executor.js";
@@ -50,6 +52,8 @@ export interface AgentConfig {
   sessionManager?: SessionManager;
   memoryManager?: MemoryManager;
   contextManager?: ContextManager;
+  permissionPolicy?: PermissionPolicy;
+  humanInput?: HumanInputHandler;
 }
 
 export class AgentBuilder {
@@ -180,6 +184,18 @@ export class AgentBuilder {
     return this;
   }
 
+  /** Set the permission policy controlling tool, file, and network access. */
+  permissions(policy: PermissionPolicy): this {
+    this.config.permissionPolicy = policy;
+    return this;
+  }
+
+  /** Set the human input handler used for confirmations (e.g., CLI prompts). */
+  humanInput(handler: HumanInputHandler): this {
+    this.config.humanInput = handler;
+    return this;
+  }
+
   /** Build the agent. Requires at minimum a model and an LLM client. */
   build(): Agent {
     // Build tool registry
@@ -211,6 +227,8 @@ export class AgentBuilder {
     const toolExecutor = new ToolExecutor(toolRegistry, {
       hookRegistry,
       middlewarePipeline: this.config.middleware.length > 0 ? pipeline : undefined,
+      permissionPolicy: this.config.permissionPolicy,
+      humanInput: this.config.humanInput,
     });
 
     const loop =

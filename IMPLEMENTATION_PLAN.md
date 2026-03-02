@@ -989,10 +989,91 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
 ---
 
 <a id="phase-11"></a>
-## Phase 11: Security & Permissions
+## Phase 11: Security & Permissions ✅ COMPLETED
+
+> **Completed on**: 2026-03-02
+>
+> **What was implemented**:
+> - A fully pluggable **permission system** modeled after the Python `curio_agent_sdk.core.security.permissions` module.
+> - File-system and network **sandbox policies** for constraining what tools can access.
+> - A **human-in-the-loop confirmation handler** for interactive approval of sensitive tool calls.
+> - Wiring of `PermissionPolicy` and `HumanInputHandler` into the `ToolExecutor` and `AgentBuilder`, and public exports from the root `index.ts`.
+>
+> **Files created/updated**:
+> - `src/core/security/permissions.ts` — Core permission types and policies:
+>   - `PermissionContext` — open-ended context for checks (`runId`, `agentId`, `toolCallId`, `toolConfig`, plus arbitrary metadata).
+>   - `PermissionResult` — result of a check with `{ allowed: boolean; reason?: string; requireConfirmation?: boolean }`.
+>   - `PermissionPolicy` — interface with:
+>     - `checkToolCall(toolName, args, context): Promise<PermissionResult>`
+>     - `checkFileAccess?(path, mode, context): Promise<PermissionResult>`
+>     - `checkNetworkAccess?(url, context): Promise<PermissionResult>`
+>   - Utility helpers:
+>     - `collectPathsFromArgs(args)` — extract `(key, value)` pairs that look like file paths (mirrors `_collect_paths_from_args` in Python).
+>     - `collectUrlsFromArgs(args)` — extract `(key, value)` pairs that look like URLs (mirrors `_collect_urls_from_args`).
+>   - Concrete policies (1:1 with Python semantics, adapted to TS idioms):
+>     - `AllowAll` — allows all tool/file/network actions with no confirmation.
+>     - `AskAlways` — allows all tool calls but always sets `requireConfirmation: true` with a human-readable reason.
+>     - `AllowReadsAskWrites` — heuristically treats read-like operations as safe and write/execute operations as requiring confirmation:
+>       - `checkToolCall` uses a write-like regex over the tool name (matches `write`, `edit`, `delete`, `run`, `execute`, `execute_code`, `shell`, `command`, `remove`, `rm`, `add`, `append`, `modify`, `update`, `install`).
+>       - `checkFileAccess` allows `"r"`/`"read"` without confirmation, otherwise sets `requireConfirmation: true`.
+>       - `checkNetworkAccess` currently allows all requests (HTTP method–specific checks can be layered on via context).
+>     - `CompoundPolicy` — combines multiple policies; evaluates them in order and returns the first deny or confirmation requirement, otherwise allows.
+>     - `FileSandboxPolicy` — restricts file access to a list of allowed path prefixes:
+>       - Normalizes paths via `node:path.resolve`, uses `path.relative` with fallback string prefix checks to guard against traversal.
+>       - `checkToolCall` inspects args via `collectPathsFromArgs()` and forwards to `checkFileAccess`.
+>       - `checkFileAccess` allows only when the resolved path is equal to or under one of the allowed prefixes; otherwise denies with a reason.
+>     - `NetworkSandboxPolicy` — restricts network access to allowed URL patterns:
+>       - Accepts a list of string patterns, each compiled either as a `RegExp` or treated as a literal substring.
+>       - Validates URLs via the WHATWG `URL` API, denying invalid hosts or non-HTTP(S) schemes.
+>       - `checkToolCall` inspects args via `collectUrlsFromArgs()` and forwards to `checkNetworkAccess`.
+> - `src/core/security/human-input.ts` — Human input abstraction:
+>   - `HumanInputHandler` interface with:
+>     - `getUserConfirmation(prompt: string, context?: Record<string, unknown>): Promise<boolean>;`
+>   - `CLIHumanInput` implementation:
+>     - Uses Node’s `readline` over `process.stdin` / `process.stdout`.
+>     - Prompts with `"<prompt> [y/N]:"` and treats `"y"`/`"yes"` (case-insensitive) as approval; everything else denies.
+> - `src/core/security/index.ts` — Barrel exports for security:
+>   - Types: `PermissionResult`, `PermissionContext`, `PermissionPolicy`, `HumanInputHandler`.
+>   - Implementations: `AllowAll`, `AskAlways`, `AllowReadsAskWrites`, `CompoundPolicy`, `FileSandboxPolicy`, `NetworkSandboxPolicy`, `CLIHumanInput`.
+>   - Utilities: `collectPathsFromArgs`, `collectUrlsFromArgs`.
+> - `src/core/tools/executor.ts` — Permission + human-input wiring:
+>   - Imports `PermissionPolicy`, `PermissionContext`, `PermissionResult` and `HumanInputHandler` from `core/security`.
+>   - Defines executor-facing aliases:
+>     - `ToolPermissionContext extends PermissionContext` with `toolCallId: string`.
+>     - `ToolPermissionResult` as a type alias for `PermissionResult`.
+>   - Extends `ToolExecutorOptions` with:
+>     - `permissionPolicy?: PermissionPolicy;`
+>     - `humanInput?: HumanInputHandler;`
+>   - Enhances `executeTool`:
+>     - Builds a `ToolPermissionContext` from `runId`, `agentId`, `toolCallId`, and `toolConfig`.
+>     - Calls `permissionPolicy.checkToolCall(toolName, args, context)`.
+>     - If `allowed === false` and `requireConfirmation !== true`, returns a `ToolResult` error (`"Permission denied: <reason>"`) and emits `tool.call.error`.
+>     - If `requireConfirmation === true`:
+>       - When `humanInput` is configured, constructs a multi-line prompt (header, tool name, JSON-formatted args, optional reason) and calls `humanInput.getUserConfirmation(...)` with context; denies with `"Permission denied by human operator"` if the user declines.
+>       - When `humanInput` is missing, denies with `"Permission denied: <reason or default message>"` and emits `tool.call.error`, ensuring safe default behavior.
+> - `src/core/agent/builder.ts` — Builder integration:
+>   - `AgentConfig` extended with:
+>     - `permissionPolicy?: PermissionPolicy;`
+>     - `humanInput?: HumanInputHandler;`
+>   - New fluent methods:
+>     - `.permissions(policy: PermissionPolicy)` — set the permission policy for the agent.
+>     - `.humanInput(handler: HumanInputHandler)` — set the human input handler used for confirmations.
+>   - `build()` passes configuration into `ToolExecutor`:
+>     - `new ToolExecutor(toolRegistry, { hookRegistry, middlewarePipeline, permissionPolicy, humanInput })`.
+> - `src/core/tools/index.ts` — Updated type exports:
+>   - Continues to export `PermissionPolicy`, `ToolPermissionContext`, and `ToolPermissionResult` (now backed by the `core/security` definitions).
+> - `src/core/security/index.ts` and `src/index.ts` — Public exports:
+>   - Root `index.ts` now exports:
+>     - Types: `PermissionResult`, `PermissionContext`, `HumanInputHandler`.
+>     - Implementations: `AllowAll`, `AskAlways`, `AllowReadsAskWrites`, `CompoundPolicy`, `FileSandboxPolicy`, `NetworkSandboxPolicy`, `CLIHumanInput`.
+>   - Existing `PermissionPolicy`, `ToolPermissionContext`, `ToolPermissionResult` exports remain available via the tools barrel.
+>
+> **Tests**:
+> - All existing tests continue to pass (`npm test` → 293 tests, 11 files, all green).
+> - Permission and human-input behavior is currently covered indirectly via `ToolExecutor` tests; direct unit tests for `core/security` can be added later to mirror the Python suite more closely.
 
 ### 11.1 Permission System
-- [ ] `core/security/permissions.ts`:
+- [x] `core/security/permissions.ts`:
   ```typescript
   interface PermissionResult {
     allowed: boolean;
@@ -1000,28 +1081,51 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
     requireConfirmation?: boolean;
   }
 
-  interface PermissionPolicy {
-    checkToolCall(toolName: string, args: Record<string, unknown>, context: PermissionContext): Promise<PermissionResult>;
-    checkFileAccess?(path: string): Promise<PermissionResult>;
-    checkNetworkAccess?(url: string): Promise<PermissionResult>;
+  interface PermissionContext extends Record<string, unknown> {
+    runId?: string;
+    agentId?: string;
+    toolCallId?: string;
+    toolConfig?: Record<string, unknown>;
   }
 
-  class AllowAll implements PermissionPolicy { ... }
-  class AskAlways implements PermissionPolicy { ... }
-  class AllowReadsAskWrites implements PermissionPolicy { ... }
-  class CompoundPolicy implements PermissionPolicy { ... }
-  class FileSandboxPolicy implements PermissionPolicy { ... }
-  class NetworkSandboxPolicy implements PermissionPolicy { ... }
+  interface PermissionPolicy {
+    checkToolCall(
+      toolName: string,
+      args: Record<string, unknown>,
+      context: PermissionContext,
+    ): Promise<PermissionResult>;
+    checkFileAccess?(
+      path: string,
+      mode: string,
+      context: PermissionContext,
+    ): Promise<PermissionResult>;
+    checkNetworkAccess?(
+      url: string,
+      context: PermissionContext,
+    ): Promise<PermissionResult>;
+  }
+
+  class AllowAll implements PermissionPolicy { /* allow everything */ }
+  class AskAlways implements PermissionPolicy { /* always requireConfirmation */ }
+  class AllowReadsAskWrites implements PermissionPolicy { /* read vs write heuristics */ }
+  class CompoundPolicy implements PermissionPolicy { /* first deny/confirm wins */ }
+  class FileSandboxPolicy implements PermissionPolicy { /* restrict paths to allowed prefixes */ }
+  class NetworkSandboxPolicy implements PermissionPolicy { /* restrict URLs to allowed patterns */ }
   ```
 
 ### 11.2 Human Input Handler
-- [ ] `core/security/human-input.ts`:
+- [x] `core/security/human-input.ts`:
   ```typescript
   interface HumanInputHandler {
-    getUserConfirmation(prompt: string, context?: Record<string, unknown>): Promise<boolean>;
+    getUserConfirmation(
+      prompt: string,
+      context?: Record<string, unknown>,
+    ): Promise<boolean>;
   }
 
-  class CLIHumanInput implements HumanInputHandler { ... }  // readline-based
+  class CLIHumanInput implements HumanInputHandler {
+    // Uses Node readline over stdin/stdout; treats "y"/"yes" as approval.
+  }
   ```
 
 ---
