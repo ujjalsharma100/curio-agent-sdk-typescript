@@ -1191,30 +1191,70 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
 ---
 
 <a id="phase-13"></a>
-## Phase 13: MCP Integration
+## Phase 13: MCP Integration ✅ COMPLETED
 
-### 13.1 MCP Client
-- [ ] `mcp/client.ts`:
-  - Connect to MCP servers (stdio and HTTP/SSE transport)
-  - List tools, call tools
-  - List/read resources
-  - List/get prompts
-  - Use `@modelcontextprotocol/sdk` npm package
+> **Completed on**: 2026-03-02
+>
+> **What was implemented**:
+> - A thin, dependency-light wrapper over the official **MCP TypeScript SDK** (`@modelcontextprotocol/sdk`) that lets Curio agents connect to MCP servers over **stdio** or **HTTP/SSE**, discover tools, resources, and prompts, and invoke tools as part of an agent workflow.
+> - A configuration layer that understands common **Claude Desktop / Cursor-style MCP config files** (`mcpServers` JSON/YAML) with **$VAR / ${VAR} environment interpolation**, and normalizes them into transport configs suitable for the MCP client.
+> - A transport abstraction that hides the concrete MCP transport classes (`StdioClientTransport`, `StreamableHTTPClientTransport`, `SSEClientTransport`) behind a stable `MCPTransportConfig` union, loading the MCP SDK lazily at runtime and failing with clear error messages if the optional dependency is missing or too old.
+> - An adapter that converts MCP **tool descriptors** (JSON Schema–backed) into Curio `Tool` objects (with namespaced names like `filesystem:list_files`), so that MCP tools can be registered in the standard `ToolRegistry` and used by the agent loop like any other tool.
+> - A bridge component (`MCPBridge`) that manages one or more MCP clients as a Curio `Component`, handling **startup/shutdown** and exposing helpers to **discover and convert tools** from configured MCP servers into Curio tools.
+> - Public exports for all MCP integration types and helpers from the root `index.ts` under the "MCP Integration" section.
+>
+> **Files created/updated**:
+> - `src/mcp/transport.ts` — Transport config + dynamic SDK loader:
+>   - `MCPTransportType` union: `"stdio" | "http" | "sse"`.
+>   - `MCPStdioTransportConfig` (command, args, env, cwd) and `MCPHttpTransportConfig` (url, headers).
+>   - `MCPTransportConfig` union and `loadMcpSdk()` (lazy `import("@modelcontextprotocol/sdk")` with clear error message when missing).
+>   - `createMcpTransport(config)` — instantiates `StdioClientTransport`, `StreamableHTTPClientTransport`, or `SSEClientTransport` depending on the config and available SDK exports, with graceful fallbacks.
+> - `src/mcp/client.ts` — High-level MCP client wrapper:
+>   - `MCPClientOptions` (name, version, `MCPTransportConfig`).
+>   - `MCPClient` class:
+>     - `connect()` / `disconnect()` with idempotent semantics.
+>     - `connected` getter.
+>     - `listTools(): Promise<MCPToolDescriptor[]>` — normalizes `{ name, description, inputSchema }` from the MCP SDK.
+>     - `callTool(name, args): Promise<unknown>` — wraps `client.callTool({ name, arguments })`, converts `result.isError === true` into thrown `Error`s, returns `result.content` by default.
+>     - `listResources(): Promise<MCPResourceDescriptor[]>` — normalizes `uri`, `name`, `description`, `mimeType` (handles `mime_type` as well).
+>     - `readResource(uri): Promise<MCPResourceReadResult>` — reads resource contents and exposes `{ uri, contents, mimeType }`.
+>     - `listPrompts(): Promise<MCPPromptDescriptor[]>` — returns `{ name, description }[]`.
+>     - `getPrompt(name, args?): Promise<MCPPromptResult>` — returns `{ name, description, messages }`.
+>   - Types: `MCPToolDescriptor`, `MCPResourceDescriptor`, `MCPResourceReadResult`, `MCPPromptDescriptor`, `MCPPromptResult`.
+> - `src/mcp/config.ts` — MCP config parser:
+>   - Raw types: `RawMCPServerConfig` (command, args, env, type, url, headers), `RawMcpConfigFile` (`mcpServers` / `servers` map).
+>   - Normalized type: `MCPServerConfig` (name, `MCPTransportConfig`, env).
+>   - `loadMcpConfig(filePath, options?)` — reads JSON or YAML from disk and delegates to `parseMcpConfigText`.
+>   - `parseMcpConfigText(text, options?)` — tries `JSON.parse` then `YAML.parse`, then delegates to `parseMcpConfig`.
+>   - `parseMcpConfig(config, options?)` — turns `mcpServers`/`servers` into an array of `MCPServerConfig`, applies **$VAR / ${VAR} interpolation** across `command`, `args`, `env`, `url`, and `headers`, defaults `type` to `"stdio"`, and normalizes unknown types back to `"stdio"`.
+>   - Helper: `resolveEnvString(value, env)` for environment substitution.
+>   - Re-exports `MCPTransportType` constant for convenience.
+> - `src/mcp/adapter.ts` — MCP → Curio tool adapter:
+>   - `MCPToolAdapterOptions` (serverName, client, tool).
+>   - `mcpToolToCurioTool({ serverName, client, tool })` — builds a Curio `Tool` with:
+>     - Name `${serverName}:${tool.name}` to avoid collisions.
+>     - Description derived from the MCP descriptor.
+>     - `ToolSchema.parameters` set to the MCP `inputSchema` (or `{ type: "object", properties: {} }` when absent).
+>     - `execute(args)` that delegates to `client.callTool(tool.name, args)` and stringifies non-string results.
+>   - `createToolsFromMcpClient(serverName, client)` — convenience helper that calls `client.listTools()` and maps each into a Curio `Tool` via `mcpToolToCurioTool`.
+> - `src/mcp/bridge.ts` — MCP bridge component:
+>   - `MCPBridgeOptions` (servers: `MCPServerConfig[]`, optional clientName/clientVersion).
+>   - `MCPBridge` extends `Component`:
+>     - `startup()` — lazily creates and connects an `MCPClient` per `MCPServerConfig`, storing them in an internal map.
+>     - `shutdown()` — disconnects all clients and clears the map.
+>     - `getClient(serverName)` — returns the `MCPClient` for a single server.
+>     - `getAllClients()` — ensures startup has run, then returns a read-only view of the internal client map.
+>     - `getTools(filter?)` — optionally filters by server name and uses `createToolsFromMcpClient` to return all MCP-backed Curio tools.
+> - `src/mcp/index.ts` — Barrel exports for all MCP types and helpers:
+>   - Transports: `MCPTransportType`, `MCPStdioTransportConfig`, `MCPHttpTransportConfig`, `MCPTransportConfig`, `createMcpTransport`, `loadMcpSdk`.
+>   - Client/types: `MCPClient`, `MCPClientOptions`, `MCPToolDescriptor`, `MCPResourceDescriptor`, `MCPResourceReadResult`, `MCPPromptDescriptor`, `MCPPromptResult`.
+>   - Config: `RawMCPServerConfig`, `RawMcpConfigFile`, `MCPServerConfig`, `LoadMcpConfigOptions`, `loadMcpConfig`, `parseMcpConfig`, `parseMcpConfigText`, `MCPTransportTypeConst`.
+>   - Adapter: `MCPToolAdapterOptions`, `mcpToolToCurioTool`, `createToolsFromMcpClient`.
+>   - Bridge: `MCPBridgeOptions`, `MCPBridge`.
+> - `src/index.ts` — new **MCP Integration** section:
+>   - Re-exports `MCPClient`, `MCPBridge`, `loadMcpConfig`, `parseMcpConfig`, `parseMcpConfigText`, `createMcpTransport`.
+>   - Re-exports all public MCP types: `MCPClientOptions`, `MCPToolDescriptor`, `MCPResourceDescriptor`, `MCPResourceReadResult`, `MCPPromptDescriptor`, `MCPPromptResult`, `MCPServerConfig`, `MCPTransportConfig`, `MCPStdioTransportConfig`, `MCPHttpTransportConfig`.
 
-### 13.2 MCP Configuration
-- [ ] `mcp/config.ts`:
-  - Parse Cursor/Claude-style MCP config format
-  - Environment variable resolution ($VAR syntax)
-  - Server lifecycle management
-
-### 13.3 MCP Transport
-- [ ] `mcp/transport.ts`:
-  - Stdio transport (spawn child process, JSON-RPC over stdin/stdout)
-  - HTTP/SSE transport (Server-Sent Events)
-
-### 13.4 MCP Bridge & Adapter
-- [ ] `mcp/bridge.ts` — Component lifecycle for MCP servers
-- [ ] `mcp/adapter.ts` — Convert MCP tools to Curio `Tool` objects
 
 ---
 

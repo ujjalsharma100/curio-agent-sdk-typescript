@@ -2,7 +2,7 @@
  * Agent-level data types — run results, metrics, and configuration.
  */
 
-import type { Message, TokenUsage, ToolCall } from "./llm.js";
+import type { Message, TokenUsage } from "./llm.js";
 
 // ---------------------------------------------------------------------------
 // Agent run result

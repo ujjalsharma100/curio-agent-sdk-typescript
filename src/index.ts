@@ -271,6 +271,28 @@ export {
   summarizeOldMemories,
 } from "./memory/index.js";
 
+// ── MCP Integration ───────────────────────────────────────────────────────────
+export {
+  MCPClient,
+  MCPBridge,
+  loadMcpConfig,
+  parseMcpConfig,
+  parseMcpConfigText,
+  createMcpTransport,
+} from "./mcp/index.js";
+export type {
+  MCPClientOptions,
+  MCPToolDescriptor,
+  MCPResourceDescriptor,
+  MCPResourceReadResult,
+  MCPPromptDescriptor,
+  MCPPromptResult,
+  MCPServerConfig,
+  MCPTransportConfig,
+  MCPStdioTransportConfig,
+  MCPHttpTransportConfig,
+} from "./mcp/index.js";
+
 // ── Utilities ────────────────────────────────────────────────────────────────
 export {
   sleep,

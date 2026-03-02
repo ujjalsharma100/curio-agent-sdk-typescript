@@ -11,9 +11,9 @@ export { ToolExecutor } from "./executor.js";
 export type {
   ToolExecutorOptions,
   ToolExecutorContext,
-  PermissionPolicy,
   ToolPermissionContext,
   ToolPermissionResult,
 } from "./executor.js";
+export type { PermissionPolicy } from "../security/permissions.js";
 export { ToolSchemaDefinition, fromZod } from "./schema.js";
 export type { FromZodOptions } from "./schema.js";

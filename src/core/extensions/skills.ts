@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import type { Tool } from "../tools/tool.js";
-import type { HookHandler } from "../events/hooks.js";
+import type { HookHandler } from "../../models/events.js";
 import { parse as parseYaml } from "yaml";
 
 export interface SkillHookDefinition {
