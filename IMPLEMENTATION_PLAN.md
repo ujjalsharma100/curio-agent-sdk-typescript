@@ -1260,23 +1260,41 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
 
 <a id="phase-14"></a>
 ## Phase 14: CLI Harness
+> **Completed on**: 2026-03-03
+>
+> **What was implemented**:
+> - `src/cli/cli.ts` — `AgentCLI` harness wrapping an `Agent` with:
+>   - `runInteractive(options?: { stream?: boolean; useSessions?: boolean; prompt?: string })` — readline-based REPL with optional streaming via `agent.astream()` or non-streaming via `agent.arun()`.
+>   - `runOnce()` — one-shot mode that reads from stdin when piped, or from a single prompt line when attached to a TTY.
+>   - `registerCommand(name, handler, description?)` — slash-command registration.
+>   - `registerKeybinding(key, handler)` — simple keybinding registration (matches entire input line).
+> - Session persistence:
+>   - Accepts an optional `SessionManager` in `CLIOptions`; otherwise reuses any `SessionManager` already attached to the agent or creates an in-memory one (`SessionManager(InMemorySessionStore)`).
+>   - When `useSessions` is true and streaming is disabled, runs call `agent.arun(input, { sessionId })` so history is persisted via the session system.
+>   - Built-in `/sessions` and `/session` commands to list and switch sessions.
+> - Built-in slash commands:
+>   - `/help`, `/clear`, `/status`, `/sessions`, `/session`, `/skills`, `/exit`.
+> - Streaming output renderer:
+>   - Renders `StreamEvent` variants (`text_delta`, `tool_call_start`, `tool_call_end`, `thinking`, `iteration_start`, `iteration_end`, `error`, `done`) to the configured output stream.
+> - Package exports:
+>   - `src/index.ts` now exports `AgentCLI`, `CLIOptions`, `SlashCommandHandler`, and `KeybindingHandler`.
 
 ### 14.1 Agent CLI
-- [ ] `cli/cli.ts`:
+- [x] `cli/cli.ts`:
   ```typescript
   class AgentCLI {
     constructor(agent: Agent, options?: CLIOptions);
     runInteractive(options?: { stream?: boolean; useSessions?: boolean; prompt?: string }): Promise<void>;
     runOnce(): Promise<void>;
-    registerCommand(name: string, handler: SlashCommandHandler): void;
-    registerKeybinding(key: string, handler: () => void): void;
+    registerCommand(name: string, handler: SlashCommandHandler, description?: string): void;
+    registerKeybinding(key: string, handler: () => void | Promise<void>): void;
   }
   ```
   - REPL loop with readline
-  - Built-in slash commands: /help, /clear, /status, /sessions, /skills, /exit
+  - Built-in slash commands: /help, /clear, /status, /sessions, /session, /skills, /exit
   - Streaming output
   - Session persistence
-  - Custom command registration
+  - Custom command and keybinding registration
 
 ---
 

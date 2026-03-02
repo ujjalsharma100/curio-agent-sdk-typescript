@@ -54,7 +54,7 @@ export class Agent {
   private readonly _toolRegistry: ToolRegistry;
   private readonly _hookRegistry: HookRegistry;
   private readonly _metadata: Record<string, unknown>;
-  private readonly _sessionManager?: SessionManager;
+  private _sessionManager?: SessionManager;
   private readonly _subagents: Map<string, Agent>;
   private _closed = false;
 
@@ -92,6 +92,21 @@ export class Agent {
   /** Get the hook registry. */
   get hookRegistry(): HookRegistry {
     return this._hookRegistry;
+  }
+
+  /** Get the session manager used for conversation persistence, if any. */
+  get sessionManager(): SessionManager | undefined {
+    return this._sessionManager;
+  }
+
+  /**
+   * Set the session manager used for conversation persistence.
+   *
+   * This is primarily intended for CLI and framework integrations that
+   * want to attach a SessionManager after the agent has been constructed.
+   */
+  set sessionManager(manager: SessionManager | undefined) {
+    this._sessionManager = manager;
   }
 
   /** Get agent metadata. */

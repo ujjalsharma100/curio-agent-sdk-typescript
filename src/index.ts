@@ -293,6 +293,14 @@ export type {
   MCPHttpTransportConfig,
 } from "./mcp/index.js";
 
+// ── CLI Harness ───────────────────────────────────────────────────────────────
+export { AgentCLI } from "./cli/cli.js";
+export type {
+  CLIOptions,
+  SlashCommandHandler,
+  KeybindingHandler,
+} from "./cli/cli.js";
+
 // ── Utilities ────────────────────────────────────────────────────────────────
 export {
   sleep,
