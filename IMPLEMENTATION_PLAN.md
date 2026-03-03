@@ -1401,29 +1401,111 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
 ---
 
 <a id="phase-16"></a>
-## Phase 16: Persistence & Audit
+## Phase 16: Persistence & Audit ✅ COMPLETED
+
+> **Completed on**: 2026-03-03
+>
+> **What was implemented**:
+> - A backend-agnostic **persistence interface** for recording agent runs, LLM usage, and aggregate statistics.
+> - Three concrete persistence backends: **in-memory**, **SQLite** (via `better-sqlite3`), and **PostgreSQL** (via `pg`).
+> - Hook-based **audit logging wiring** that streams agent lifecycle, LLM, and tool events into any `Persistence` implementation.
+> - Public exports from the `persistence/` barrel and root `index.ts`, plus a focused persistence test suite.
+>
+> **Files created/updated**:
+> - `src/persistence/base.ts` — core types and `Persistence` interface.
+> - `src/persistence/memory.ts` — `InMemoryPersistence` implementation.
+> - `src/persistence/sqlite.ts` — `SqlitePersistence` implementation (lazy `better-sqlite3`).
+> - `src/persistence/postgres.ts` — `PostgresPersistence` implementation (lazy `pg`).
+> - `src/persistence/audit-hooks.ts` — `registerAuditHooks()` helper for audit wiring.
+> - `src/persistence/index.ts` — barrel exports for all persistence types and implementations.
+> - `src/index.ts` — new **Persistence & Audit** section with public exports.
+> - `tests/unit/persistence.test.ts` — persistence + audit tests (InMemory, Sqlite*, Postgres*, audit hooks).
+>
+> **Test results**:
+> - `npm test` → 16 files, 352 tests, all passing (including persistence tests).
 
 ### 16.1 Persistence Interface
-- [ ] `persistence/base.ts`:
-  ```typescript
-  interface Persistence {
-    createAgentRun(run: AgentRun): Promise<void>;
-    updateAgentRun(runId: string, update: Partial<AgentRun>): Promise<void>;
-    getAgentRun(runId: string): Promise<AgentRun | null>;
-    logEvent(event: AgentEvent): Promise<void>;
-    logLLMUsage(usage: LLMUsageRecord): Promise<void>;
-    getStats(agentId?: string): Promise<AgentStats>;
-  }
-  ```
+- [x] `persistence/base.ts`:
+  - **Core record types**:
+    - `AgentRunStatus` — `"running" | "completed" | "error"`.
+    - `AgentRun` — durable run record with:
+      - `runId`, `agentId`, optional `agentName`, `input`, `output`, `status`.
+      - `startedAt`, optional `completedAt`, `durationMs`, `model`.
+      - Optional `usage: TokenUsage`, `metrics: AgentMetrics`, `errorMessage`, `metadata`.
+    - `LLMUsageRecord` — one LLM call usage entry:
+      - `runId?`, `agentId?`, `provider?`, `model`, token counts, `latencyMs?`, `costUsd?`, `timestamp`.
+    - `AgentStats` — aggregate snapshot:
+      - `runsTotal`, `runsSucceeded`, `runsFailed`.
+      - `totalTokens`, `promptTokens`, `completionTokens`.
+      - `llmCalls`, `toolCalls`, `totalCostUsd`, `averageRunDurationMs`, optional `lastRunAt`.
+  - **Interfaces**:
+    - `Persistence`:
+      - `createAgentRun(run: AgentRun): Promise<void>;`
+      - `updateAgentRun(runId: string, update: Partial<AgentRun>): Promise<void>;`
+      - `getAgentRun(runId: string): Promise<AgentRun | null>;`
+      - `logEvent(event: AgentEvent): Promise<void>;`
+      - `logLLMUsage(usage: LLMUsageRecord): Promise<void>;`
+      - `getStats(agentId?: string): Promise<AgentStats>;`
+    - `AgentRunWithResult` — convenience extension of `AgentRun` that can include an `AgentRunResult`.
 
 ### 16.2 Implementations
-- [ ] `persistence/memory.ts` — In-memory (development)
-- [ ] `persistence/sqlite.ts` — SQLite via `better-sqlite3`
-- [ ] `persistence/postgres.ts` — PostgreSQL via `pg`
+- [x] `persistence/memory.ts` — **InMemoryPersistence** (development / tests)
+  - Stores runs in a `Map<string, AgentRun>`, events and usage in arrays.
+  - `createAgentRun` / `updateAgentRun` implement upsert semantics with safe defaults.
+  - `getStats(agentId?)`:
+    - Aggregates from runs: counts, token totals, costs, durations, `lastRunAt`.
+    - Falls back to `LLMUsageRecord` data when runs lack `usage`, to keep stats useful even when only LLM usage is logged.
+
+- [x] `persistence/sqlite.ts` — **SqlitePersistence** via `better-sqlite3`
+  - Lazily `require("better-sqlite3")`; throws a clear error if the dependency is missing.
+  - Initializes schema on first use:
+    - `agent_runs` — mirrors `AgentRun` with JSON-encoded `usage`, `metrics`, `metadata`.
+    - `events` — `run_id`, `agent_id`, `type`, `timestamp`, `data_json`.
+    - `llm_usage` — `run_id`, `agent_id`, `provider`, `model`, tokens, `latency_ms`, `cost_usd`, `timestamp`.
+  - `createAgentRun` uses `INSERT OR REPLACE` and a row mapper (`toRunRow` / `fromRunRow`).
+  - `updateAgentRun` merges with `getAgentRun` then delegates to `createAgentRun`.
+  - `getStats(agentId?)`:
+    - Selects matching `agent_runs` and aggregates totals in TypeScript (runs, usage, costs, durations, lastRunAt).
+
+- [x] `persistence/postgres.ts` — **PostgresPersistence** via `pg`
+  - Lazily `require("pg").Pool`; throws a clear error if `pg` is not installed.
+  - `ensureInitialized()` lazily creates:
+    - `agent_runs` — JSONB `usage_json`, `metrics_json`, `metadata_json`.
+    - `events` — same shape as SQLite version (but JSONB).
+    - `llm_usage` — tokens, latency, cost, timestamp.
+  - `createAgentRun`:
+    - `INSERT ... ON CONFLICT (run_id) DO UPDATE` to support idempotent writes.
+  - `updateAgentRun`:
+    - Loads existing run (if any) and merges with `update`, otherwise constructs a minimal run and upserts.
+  - `getStats(agentId?)`:
+    - Single SQL aggregation query using JSONB operators:
+      - Sums `promptTokens` / `completionTokens` / `totalTokens`, `llmCalls`, `toolCalls`, `estimatedCost`.
+      - Aggregates `duration_ms` and `MAX(COALESCE(completed_at, started_at))` as `last_run_at`.
+    - Returns a zeroed `AgentStats` struct when no rows are present, to avoid `undefined` cases under strict typing.
 
 ### 16.3 Audit Hooks
-- [ ] `persistence/audit-hooks.ts`:
-  - `registerAuditHooks(hookRegistry, persistence)` — automatic audit logging
+- [x] `persistence/audit-hooks.ts`:
+  - `registerAuditHooks(hookRegistry, persistence)` — automatic audit logging wired into the **HookRegistry**:
+    - **Agent run hooks**:
+      - `AGENT_RUN_BEFORE`:
+        - Calls `persistence.createAgentRun()` with `status: "running"`, `runId`, `agentId`, `agentName`, `input`/`prompt`, `model`, and `metadata`.
+        - Logs `EventType.RUN_STARTED` via `persistence.logEvent()`.
+      - `AGENT_RUN_AFTER`:
+        - Calls `updateAgentRun` with `status: "completed"`, `completedAt`, `durationMs?`, `errorMessage?`.
+        - Logs `EventType.RUN_COMPLETED`.
+      - `AGENT_RUN_ERROR`:
+        - Same as above but with `status: "error"` and `EventType.RUN_ERROR`, capturing error details from `ctx.data`.
+    - **LLM hooks**:
+      - `LLM_CALL_BEFORE` → logs `EventType.LLM_CALL_STARTED`.
+      - `LLM_CALL_AFTER`:
+        - Logs `EventType.LLM_CALL_COMPLETED`.
+        - Extracts `provider`, `model`, and `usage` from `ctx.data.response` and writes an `LLMUsageRecord` via `logLLMUsage`, including `latencyMs` when present.
+      - `LLM_CALL_ERROR` → logs `EventType.LLM_CALL_ERROR`.
+    - **Tool hooks**:
+      - `TOOL_CALL_BEFORE` → logs `EventType.TOOL_CALL_STARTED` (tool name, args).
+      - `TOOL_CALL_AFTER` → logs `EventType.TOOL_CALL_COMPLETED` (including result preview if attached in the data).
+      - `TOOL_CALL_ERROR` → logs `EventType.TOOL_CALL_ERROR`.
+  - Designed to compose cleanly with existing **TracingConsumer**, **LoggingConsumer**, and `InMemoryEventBus` consumers.
 
 ---
 

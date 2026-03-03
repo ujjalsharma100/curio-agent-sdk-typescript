@@ -293,6 +293,26 @@ export type {
   MCPHttpTransportConfig,
 } from "./mcp/index.js";
 
+// ── Persistence & Audit ───────────────────────────────────────────────────────
+export type {
+  AgentRunStatus,
+  AgentRun,
+  LLMUsageRecord,
+  AgentStats,
+  Persistence,
+  AgentRunWithResult,
+} from "./persistence/index.js";
+export {
+  InMemoryPersistence,
+  SqlitePersistence,
+  PostgresPersistence,
+  registerAuditHooks,
+} from "./persistence/index.js";
+export type {
+  SqlitePersistenceOptions,
+  PostgresPersistenceOptions,
+} from "./persistence/index.js";
+
 // ── CLI Harness ───────────────────────────────────────────────────────────────
 export { AgentCLI } from "./cli/cli.js";
 export type {
