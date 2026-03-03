@@ -1740,22 +1740,29 @@ Python currently includes:
   - Validate final `AgentRunResult` contract (`status`, `output`, usage, iteration counts, error handling)
   - Validate key side-effects (session messages saved, files written in temp dirs, memory carried across runs)
   - Keep flows deterministic through `MockLLM` and explicit response queues
+### 20.5 Performance and overhead tests parity (`tests/performance/`)
+- [ ] Add a `tests/performance/` suite to mirror the Python SDK’s performance benchmarks:
+  - `state-checkpoint-perf.test.ts` — serialize/deserialize large `Checkpoint` instances 100–500 times under strict time budgets (e.g. \< 2–5s), asserting integrity of all fields.
+  - `middleware-overhead.test.ts` — run thousands of passes through a `MiddlewarePipeline` with no-op and counting middleware, plus hook emission via `HookRegistry`, and assert total runtime stays below thresholds similar to the Python `test_middleware_overhead.py`.
+  - `memory-operations-perf.test.ts` — benchmark `ConversationMemory` and `KeyValueMemory` add/search/set/get throughput (1000+ ops) under fixed wall-clock limits, validating counts and correctness.
+- [ ] Mark these tests as `slow`/non-default in Vitest (e.g. separate `test:perf` script or conditional `describe.skip`), so they can be opted into locally/CI without impacting the default fast test loop.
+- [ ] Ensure all performance tests are deterministic (no real network, controlled clock where possible) and document expected time budgets in comments to keep future refactors honest.
 
-### 20.5 Optional live/provider smoke tests
+### 20.6 Optional live/provider smoke tests
 - [x] Add a small `tests/live/` suite for provider sanity checks (OpenAI/Anthropic/etc.) behind environment gates:
   - Run only when `RUN_LIVE_TESTS=true` and provider keys are set
   - Keep smoke tests minimal (single prompt per provider)
   - Exclude by default from CI required checks
 - [x] Document expected env vars and runtime cost caveats in `README.md`.
 
-### 20.6 CI/CD integration and quality gates
+### 20.7 CI/CD integration and quality gates
 - [x] Update CI workflow to run:
   - Required: `typecheck`, `lint`, `test:unit`, `test:integration`, `test:e2e`
   - Optional scheduled/manual: `test:live`, `test:coverage`
 - [x] Add coverage thresholds for integration-critical modules (agent loop, tool execution, middleware, memory, state, MCP).
 - [x] Publish artifacts for failed E2E runs (logs/snapshots/replays) to speed up debugging.
 
-### 20.7 Deliverables
+### 20.8 Deliverables
 - [x] New directories and scaffolding:
   - `tests/integration/`
   - `tests/e2e/`
@@ -1766,7 +1773,7 @@ Python currently includes:
 - [x] A parity checklist mapping each Python integration/E2E file to a TypeScript counterpart
 - [x] Contributor docs section: "How to write integration and E2E tests"
 
-### 20.8 Acceptance criteria
+### 20.9 Acceptance criteria
 - [x] Every Python integration domain has at least one corresponding TypeScript integration test module.
 - [x] Every Python E2E scenario class (simple, tools, multi-turn, coding, multi-agent, memory, resilience, structured output) has TypeScript coverage.
 - [x] `npm run test:integration` and `npm run test:e2e` pass consistently in CI.

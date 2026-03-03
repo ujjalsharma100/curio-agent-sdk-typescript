@@ -61,6 +61,7 @@
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration --testTimeout=15000",
     "test:e2e": "vitest run tests/e2e --testTimeout=20000",
+    "test:perf": "vitest run tests/performance --testTimeout=30000",
     "test:live": "RUN_LIVE_TESTS=true vitest run tests/live --testTimeout=60000",
     "test:all": "vitest run tests/unit tests/integration tests/e2e",
     "test:watch": "vitest",
