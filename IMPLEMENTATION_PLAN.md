@@ -1510,10 +1510,38 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
 ---
 
 <a id="phase-17"></a>
-## Phase 17: Testing Utilities
+## Phase 17: Testing Utilities ✅ COMPLETED
+
+> **Completed on**: 2026-03-03
+>
+> **What was implemented**:
+> - A full testing utilities package under `src/testing/` for deterministic agent testing, replay workflows, evaluation, and regression/snapshot safety checks.
+> - `MockLLM` with queued text/tool/stream responses and request history, compatible with both the provider interface and the runtime `ILLMClient`.
+> - `AgentTestHarness` with simple assertions for tool invocation and output text.
+> - `RecordingMiddleware` + `ReplayLLMClient` for record/replay style tests.
+> - `ToolTestKit` for per-tool mocking, call inspection, and call-order assertions.
+> - Eval helpers (`EvalDataset`, `AgentEvalSuite`, metrics), coverage tracker, regression detector, and snapshot tester.
+> - Public exports wired through `src/testing/index.ts` and validated with dedicated unit tests.
+>
+> **Files created/updated**:
+> - `src/testing/mock-llm.ts` — `MockLLM`
+> - `src/testing/harness.ts` — `AgentTestHarness`
+> - `src/testing/replay.ts` — `RecordingMiddleware`, `ReplayLLMClient`
+> - `src/testing/toolkit.ts` — `ToolTestKit`
+> - `src/testing/eval.ts` — eval dataset/suite/results + built-in metrics
+> - `src/testing/coverage.ts` — `AgentCoverageTracker`, `mergeCoverageReports`
+> - `src/testing/regression.ts` — `RegressionDetector`
+> - `src/testing/snapshot.ts` — `SnapshotTester`, `SnapshotMismatchError`
+> - `src/testing/index.ts` — barrel exports for all testing utilities
+> - `tests/unit/testing-utils.test.ts` — focused tests for Phase 17 features
+>
+> **Test results**:
+> - `npm run typecheck` → passing
+> - `npm run test -- tests/unit/testing-utils.test.ts` → passing
+> - `npm test` → full suite passing
 
 ### 17.1 Mock LLM
-- [ ] `testing/mock-llm.ts`:
+- [x] `testing/mock-llm.ts`:
   ```typescript
   class MockLLM implements LLMProvider {
     addTextResponse(text: string): void;
@@ -1524,7 +1552,7 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
   ```
 
 ### 17.2 Test Harness
-- [ ] `testing/harness.ts`:
+- [x] `testing/harness.ts`:
   ```typescript
   class AgentTestHarness {
     constructor(agent: Agent);
@@ -1537,20 +1565,20 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
   ```
 
 ### 17.3 Replay System
-- [ ] `testing/replay.ts`:
-  - `RecordingMiddleware` — record real LLM interactions to JSON
-  - `ReplayLLMClient` — replay recorded interactions deterministically
+- [x] `testing/replay.ts`:
+  - [x] `RecordingMiddleware` — record real LLM interactions to JSON
+  - [x] `ReplayLLMClient` — replay recorded interactions deterministically
 
 ### 17.4 Tool Test Kit
-- [ ] `testing/toolkit.ts` — Mock individual tools, assert call order
+- [x] `testing/toolkit.ts` — Mock individual tools, assert call order
 
 ### 17.5 Eval Suite
-- [ ] `testing/eval.ts` — Benchmark against datasets, compute metrics
+- [x] `testing/eval.ts` — Benchmark against datasets, compute metrics
 
 ### 17.6 Coverage, Regression, Snapshot
-- [ ] `testing/coverage.ts` — Track tool/code path coverage
-- [ ] `testing/regression.ts` — Detect behavioral changes
-- [ ] `testing/snapshot.ts` — Compare outputs against snapshots
+- [x] `testing/coverage.ts` — Track tool/code path coverage
+- [x] `testing/regression.ts` — Detect behavioral changes
+- [x] `testing/snapshot.ts` — Compare outputs against snapshots
 
 ---
 
