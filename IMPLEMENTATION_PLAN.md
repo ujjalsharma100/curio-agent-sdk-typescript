@@ -1583,21 +1583,36 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
 ---
 
 <a id="phase-18"></a>
-## Phase 18: Connectors, Credentials, Resilience
+## Phase 18: Connectors, Credentials, Resilience ✅ COMPLETED
+
+> **Completed on**: 2026-03-03
+>
+> **What was implemented**:
+> - `src/connectors/base.ts` — `Connector` interface + `BaseConnector` abstract lifecycle class.
+> - `src/connectors/bridge.ts` — `ConnectorBridge` component for multi-connector lifecycle and request routing.
+> - `src/credentials/credentials.ts` — `CredentialResolver` + `EnvCredentialResolver`, `VaultCredentialResolver` (optional), `AWSSecretsResolver` (optional), and chain helpers.
+> - `src/resilience/circuit-breaker.ts` — `CircuitBreaker` with closed/open/half-open states and configurable thresholds/timeouts.
+> - `src/core/llm/client.ts` — breaker-wrapped provider calls and tier fallback integration for resilient failover.
+> - `src/index.ts` — public exports for connectors, credentials, and resilience.
+> - `tests/unit/resilience.test.ts` — coverage for connector lifecycle, credential resolution, circuit transitions, and failover behavior.
+>
+> **Test results**:
+> - `npm run test -- tests/unit/resilience.test.ts`
+> - `npm run typecheck`
 
 ### 18.1 Connectors
-- [ ] `connectors/base.ts` — Abstract connector interface
-- [ ] `connectors/bridge.ts` — Component lifecycle bridge
+- [x] `connectors/base.ts` — Abstract connector interface
+- [x] `connectors/bridge.ts` — Component lifecycle bridge
 
 ### 18.2 Credentials
-- [ ] `credentials/credentials.ts`:
+- [x] `credentials/credentials.ts`:
   - `CredentialResolver` interface
   - `EnvCredentialResolver` — from environment variables
   - `VaultCredentialResolver` — HashiCorp Vault (optional)
   - `AWSSecretsResolver` — AWS Secrets Manager (optional)
 
 ### 18.3 Circuit Breaker
-- [ ] `resilience/circuit-breaker.ts`:
+- [x] `resilience/circuit-breaker.ts`:
   - Open/Closed/Half-Open states
   - Configurable failure threshold and timeout
   - Used in LLM failover

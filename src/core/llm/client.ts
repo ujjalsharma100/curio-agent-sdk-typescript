@@ -32,6 +32,7 @@ import { TieredRouter } from "./router.js";
 import type { RouterConfig } from "./router.js";
 import { withRetry, DedupCache } from "../../utils/async.js";
 import { hashObject } from "../../utils/hash.js";
+import { CircuitBreaker } from "../../resilience/circuit-breaker.js";
 
 // ---------------------------------------------------------------------------
 // Interface (consumed by agent loop/runtime)
@@ -65,6 +66,15 @@ export interface LLMClientConfig {
   dedupTtl?: number;
   /** Auto-discover providers from environment variables. Default: true. */
   autoDiscover?: boolean;
+  /** Circuit breaker options for provider/model calls. Disabled when false. */
+  circuitBreaker?:
+    | false
+    | {
+        failureThreshold?: number;
+        recoveryTimeoutMs?: number;
+        halfOpenMaxCalls?: number;
+        successThreshold?: number;
+      };
 }
 
 // ---------------------------------------------------------------------------
@@ -78,6 +88,15 @@ export class LLMClient implements ILLMClient {
   private readonly maxRetries: number;
   private readonly retryBaseDelay: number;
   private readonly dedupCache: DedupCache<Promise<LLMResponse>> | null;
+  private readonly circuitBreakerConfig:
+    | {
+        failureThreshold?: number;
+        recoveryTimeoutMs?: number;
+        halfOpenMaxCalls?: number;
+        successThreshold?: number;
+      }
+    | null;
+  private readonly circuitBreakers = new Map<string, CircuitBreaker>();
 
   /** Cumulative usage across all calls. */
   private _totalUsage: TokenUsage = emptyTokenUsage();
@@ -88,6 +107,7 @@ export class LLMClient implements ILLMClient {
     this.maxRetries = config.maxRetries ?? 2;
     this.retryBaseDelay = config.retryBaseDelay ?? 1000;
     this.dedupCache = config.dedup !== false ? new DedupCache(config.dedupTtl ?? 30_000) : null;
+    this.circuitBreakerConfig = config.circuitBreaker === false ? null : config.circuitBreaker ?? {};
     this.router = new TieredRouter(config.router);
 
     // Store provider configs
@@ -126,26 +146,13 @@ export class LLMClient implements ILLMClient {
   // ── Execution ────────────────────────────────────────────────────────────
 
   async call(request: LLMRequest): Promise<LLMResponse> {
-    // Resolve provider and model
-    const { provider: providerName, modelId } = this.resolveModel(request.model);
-    const provider = this.providers.get(providerName);
-    if (!provider) {
-      throw new NoAvailableModelError(`Provider "${providerName}" not registered`, {
-        provider: providerName,
-        model: modelId,
-      });
-    }
-
-    const provConfig = this.providerConfigs.get(providerName) ?? {};
-    const resolvedRequest = { ...request, model: modelId };
-
     // Dedup check
     if (this.dedupCache) {
-      const key = hashObject({ model: modelId, messages: request.messages, tools: request.tools });
+      const key = hashObject({ model: request.model, messages: request.messages, tools: request.tools });
       const cached = this.dedupCache.get(key);
       if (cached) return cached;
 
-      const promise = this.callWithRetry(provider, resolvedRequest, provConfig);
+      const promise = this.callWithFailover(request);
       this.dedupCache.set(key, promise);
 
       try {
@@ -157,7 +164,7 @@ export class LLMClient implements ILLMClient {
       }
     }
 
-    return this.callWithRetry(provider, resolvedRequest, provConfig);
+    return this.callWithFailover(request);
   }
 
   async *stream(request: LLMRequest): AsyncIterableIterator<LLMStreamChunk> {
@@ -221,24 +228,67 @@ export class LLMClient implements ILLMClient {
     return response;
   }
 
-  private resolveModel(model: string): { provider: string; modelId: string } {
+  private async callWithFailover(request: LLMRequest): Promise<LLMResponse> {
+    const attempted = new Set<string>();
+    let resolved = this.resolveModel(request.model);
+    let lastError: unknown;
+
+    while (true) {
+      const providerName = resolved.provider;
+      const provider = this.providers.get(providerName);
+      if (!provider) {
+        throw new NoAvailableModelError(`Provider "${providerName}" not registered`, {
+          provider: providerName,
+          model: resolved.modelId,
+        });
+      }
+
+      const modelKey = `${providerName}:${resolved.modelId}`;
+      if (attempted.has(modelKey)) {
+        throw new NoAvailableModelError(`No unused fallback models remain for "${request.model}"`);
+      }
+      attempted.add(modelKey);
+
+      const provConfig = this.providerConfigs.get(providerName) ?? {};
+      const resolvedRequest = { ...request, model: resolved.modelId };
+      const breaker = this.getCircuitBreaker(modelKey);
+
+      try {
+        return await breaker.execute(() => this.callWithRetry(provider, resolvedRequest, provConfig));
+      } catch (error) {
+        lastError = error;
+      }
+
+      if (!this.router.hasTiers) {
+        throw (lastError ?? new NoAvailableModelError(`No available model for "${request.model}"`));
+      }
+
+      const fallback = this.router.getFallback(modelKey, resolved.tier, this.providers);
+      if (!fallback) {
+        throw (lastError ?? new NoAvailableModelError(`No fallback available for "${request.model}"`));
+      }
+      resolved = fallback;
+    }
+  }
+
+  private resolveModel(model: string): { provider: string; modelId: string; tier: number } {
     // If router has tiers, use it
     if (this.router.hasTiers) {
       const resolved = this.router.resolve(model, this.providers);
-      return { provider: resolved.provider, modelId: resolved.modelId };
+      return { provider: resolved.provider, modelId: resolved.modelId, tier: resolved.tier };
     }
 
     // Direct resolution
     const { provider, modelId } = parseModelString(model);
 
     if (provider) {
-      return { provider, modelId };
+      return { provider, modelId, tier: 2 };
     }
 
     // Try to find a provider for this model
     for (const [name, prov] of this.providers) {
       if (prov.supportsModel(modelId)) {
-        return { provider: name, modelId };
+        return { provider: name, modelId, tier: 2 };
       }
     }
 
@@ -273,5 +323,26 @@ export class LLMClient implements ILLMClient {
         this.providers.set("ollama", new OllamaProvider());
       }
     }
+  }
+
+  private getCircuitBreaker(key: string): CircuitBreaker {
+    const existing = this.circuitBreakers.get(key);
+    if (existing) {
+      return existing;
+    }
+
+    const circuitBreaker = new CircuitBreaker({
+      failureThreshold: this.circuitBreakerConfig?.failureThreshold,
+      recoveryTimeoutMs: this.circuitBreakerConfig?.recoveryTimeoutMs,
+      halfOpenMaxCalls: this.circuitBreakerConfig?.halfOpenMaxCalls,
+      successThreshold: this.circuitBreakerConfig?.successThreshold,
+      shouldCountFailure: (error) => {
+        if (error instanceof LLMRateLimitError) return true;
+        if (error instanceof LLMProviderError) return true;
+        return true;
+      },
+    });
+    this.circuitBreakers.set(key, circuitBreaker);
+    return circuitBreaker;
   }
 }

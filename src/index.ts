@@ -313,6 +313,35 @@ export type {
   PostgresPersistenceOptions,
 } from "./persistence/index.js";
 
+// ── Connectors ────────────────────────────────────────────────────────────────
+export type {
+  Connector,
+  ConnectorRequestContext,
+  BaseConnectorOptions,
+  ConnectorBridgeOptions,
+} from "./connectors/index.js";
+export { BaseConnector, ConnectorBridge } from "./connectors/index.js";
+
+// ── Credentials ───────────────────────────────────────────────────────────────
+export type {
+  CredentialResolveOptions,
+  CredentialResolver,
+  EnvCredentialResolverOptions,
+  VaultCredentialResolverOptions,
+  AWSSecretsResolverOptions,
+} from "./credentials/index.js";
+export {
+  EnvCredentialResolver,
+  VaultCredentialResolver,
+  AWSSecretsResolver,
+  resolveCredentialChain,
+  resolveCredentialOrThrow,
+} from "./credentials/index.js";
+
+// ── Resilience ────────────────────────────────────────────────────────────────
+export type { CircuitState, CircuitBreakerOptions } from "./resilience/index.js";
+export { CircuitBreaker } from "./resilience/index.js";
+
 // ── CLI Harness ───────────────────────────────────────────────────────────────
 export { AgentCLI } from "./cli/cli.js";
 export type {
