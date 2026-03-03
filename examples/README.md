@@ -19,6 +19,40 @@ npm install
 - Set at least one provider key (for example `OPENAI_API_KEY`).
 - Use Node 20+ and a TypeScript runner such as `tsx`.
 
+### Setting provider keys
+
+Examples expect your provider credentials to be available as environment variables. For OpenAI, Anthropic, and Groq this typically looks like:
+
+```bash
+export OPENAI_API_KEY=sk-...
+export ANTHROPIC_API_KEY=sk-ant-...
+export GROQ_API_KEY=gsk_...
+```
+
+To persist a key for your shell, you can add it to your shell profile (for example on zsh):
+
+```bash
+echo 'export OPENAI_API_KEY=sk-...' >> ~/.zshrc
+source ~/.zshrc
+```
+
+If you prefer using a `.env` file, install `dotenv` and load it before running examples:
+
+```bash
+npm install dotenv
+```
+
+Then, in your example entrypoint:
+
+```typescript
+import "dotenv/config";
+```
+
+Make sure the environment variable name matches the provider prefix used in your model string:
+- `openai:...` → `OPENAI_API_KEY`
+- `anthropic:...` → `ANTHROPIC_API_KEY`
+- `groq:...` → `GROQ_API_KEY`
+
 ## Example Index
 
 ### `hello-world.ts`
