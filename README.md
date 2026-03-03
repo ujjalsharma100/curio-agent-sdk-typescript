@@ -108,7 +108,7 @@ console.log(result.output);
 ## Directory Structure
 
 ```
-curio_agent_sdk_typescript/
+curio-agent-sdk-typescript/
 ├── docs/
 │   ├── API_REFERENCE.md      # Generated API docs
 │   └── ARCHITECTURE.md       # Architecture guide and diagrams
