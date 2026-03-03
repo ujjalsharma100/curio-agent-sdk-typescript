@@ -1624,11 +1624,11 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
 ## Phase 19: Documentation & Publishing
 
 ### 19.1 Documentation
-- [ ] README with quick start guide
-- [ ] API reference (generated from TSDoc comments)
-- [ ] Migration guide from Python SDK
-- [ ] Cookbook / examples directory
-- [ ] Architecture guide
+- [x] README with quick start guide
+- [x] API reference (generated from TSDoc comments)
+- [x] Migration guide from Python SDK
+- [x] Cookbook / examples directory
+- [x] Architecture guide
 
 ### 19.2 Publishing
 - [ ] npm publish workflow
