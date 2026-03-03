@@ -16,6 +16,7 @@ The SDK is designed for real agent workloads, not just demo wrappers:
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
+- [Directory Structure](#directory-structure)
 - [Core Concepts](#core-concepts)
 - [Model and Provider Configuration](#model-and-provider-configuration)
 - [Tools](#tools)
@@ -103,6 +104,67 @@ const agent = Agent.builder()
 const result = await agent.run("What is 17 * 23?");
 console.log(result.output);
 ```
+
+## Directory Structure
+
+```
+curio_agent_sdk_typescript/
+├── docs/
+│   ├── API_REFERENCE.md      # Generated API docs
+│   └── ARCHITECTURE.md       # Architecture guide and diagrams
+├── examples/
+│   ├── README.md             # Cookbook and example index
+│   ├── hello-world.ts
+│   ├── memory-agent.ts
+│   ├── streaming-agent.ts
+│   └── tool-agent.ts
+├── src/
+│   ├── index.ts              # Main package entry; re-exports public API
+│   ├── base/                 # Component base and shared primitives
+│   ├── cli/                  # CLI harness (AgentCLI, REPL)
+│   ├── connectors/           # Connector bridge and base (HTTP, DB, etc.)
+│   ├── core/
+│   │   ├── agent/            # Agent, AgentBuilder, Runtime
+│   │   ├── context/          # Context and instruction assembly
+│   │   ├── events/           # Hooks, event bus
+│   │   ├── extensions/       # Skills, plugins, subagents
+│   │   ├── llm/              # LLMClient, providers, router, token counting
+│   │   ├── loops/            # ToolCallingLoop and loop abstraction
+│   │   ├── security/         # Permissions, human-input
+│   │   ├── state/            # AgentState, session, checkpoint, state store
+│   │   └── tools/            # Tool definition, registry, executor, schema
+│   ├── credentials/          # Credential resolution
+│   ├── memory/               # MemoryManager, backends, strategies
+│   ├── middleware/           # Logging, tracing, guardrails, rate-limit, etc.
+│   ├── mcp/                  # MCP bridge, client, config, transport
+│   ├── models/               # Types: messages, LLM, agent, events
+│   ├── persistence/          # Run/audit persistence (memory, sqlite, postgres)
+│   ├── resilience/           # Circuit breaker and retry
+│   ├── testing/              # MockLLM, harness, replay, eval, coverage
+│   ├── tools/                # Built-in tools (web-fetch, file, shell, etc.)
+│   └── utils/                # Async, hashing, logging helpers
+├── tests/
+│   ├── setup.ts
+│   ├── fixtures/             # Shared test fixtures
+│   ├── unit/
+│   ├── integration/
+│   ├── e2e/
+│   ├── performance/
+│   └── live/
+├── package.json
+├── tsconfig.json
+├── tsup.config.ts
+├── typedoc.json
+├── vitest.config.ts
+└── README.md
+```
+
+Package entry points (see `package.json` exports):
+
+- **`curio-agent-sdk`** — main API (Agent, tools, LLM, hooks, etc.)
+- **`curio-agent-sdk/testing`** — MockLLM, AgentTestHarness, record/replay, evals
+- **`curio-agent-sdk/memory`** — MemoryManager, backends, strategies
+- **`curio-agent-sdk/middleware`** — Middleware implementations and consumers
 
 ## Core Concepts
 

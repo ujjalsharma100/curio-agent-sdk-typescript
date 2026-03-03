@@ -10,6 +10,7 @@ It is intended for:
 ## Table of Contents
 
 - [Design Goals](#design-goals)
+- [Architecture Overview (Diagrams)](#architecture-overview-diagrams)
 - [System Overview](#system-overview)
 - [Build-time Composition](#build-time-composition)
 - [Run-time Execution Lifecycle](#run-time-execution-lifecycle)
@@ -33,6 +34,181 @@ The architecture optimizes for:
 - observability (structured hooks/events and middleware integration)
 - deterministic testing (mock clients and fixture-driven execution)
 - incremental adoption (simple agent first, advanced features later)
+
+## Architecture Overview (Diagrams)
+
+### High-level component diagram
+
+```mermaid
+flowchart TB
+    subgraph User["User / App"]
+        Run["agent.run() / astream()"]
+    end
+
+    subgraph Agent["Agent"]
+        Builder["AgentBuilder"]
+        Runtime["Runtime"]
+        Loop["ToolCallingLoop"]
+    end
+
+    subgraph Core["Core services"]
+        Registry["ToolRegistry"]
+        Executor["ToolExecutor"]
+        Hooks["HookRegistry"]
+        StateStore["StateStore"]
+    end
+
+    subgraph Optional["Optional extensions"]
+        Memory["MemoryManager"]
+        Session["SessionManager"]
+        Middleware["MiddlewarePipeline"]
+        Permissions["PermissionPolicy"]
+    end
+
+    subgraph External["External"]
+        LLM["LLMClient → Providers"]
+        Persistence["Persistence backends"]
+    end
+
+    Run --> Runtime
+    Builder --> Runtime
+    Runtime --> Loop
+    Runtime --> Registry
+    Runtime --> Executor
+    Runtime --> Hooks
+    Runtime --> StateStore
+    Runtime --> Memory
+    Runtime --> Session
+    Runtime --> Middleware
+    Runtime --> Permissions
+    Loop --> LLM
+    Loop --> Executor
+    Executor --> Registry
+    Memory --> Persistence
+    Session --> StateStore
+```
+
+### Build-time composition flow
+
+```mermaid
+sequenceDiagram
+    participant App
+    participant AgentBuilder
+    participant Registries
+    participant Runtime
+
+    App->>AgentBuilder: Agent.builder()
+    App->>AgentBuilder: .model(), .tool(), .memoryManager(), ...
+    App->>AgentBuilder: .build()
+
+    AgentBuilder->>Registries: Create ToolRegistry, ToolExecutor
+    AgentBuilder->>Registries: Create HookRegistry
+    AgentBuilder->>Registries: Create StateStore (if sessions)
+    AgentBuilder->>Runtime: Create Runtime(ToolCallingLoop, ...)
+    AgentBuilder->>Runtime: Wire MemoryManager, SessionManager, Middleware
+    Runtime-->>App: Agent instance
+```
+
+### Run-time execution pipeline
+
+```mermaid
+flowchart LR
+    A[Input] --> B[Pre-run: load session, create state]
+    B --> C[Inject memory context]
+    C --> D[Enter loop]
+    D --> E[LLM call]
+    E --> F{Tool calls?}
+    F -->|Yes| G[ToolExecutor: validate & execute]
+    G --> H[Append results to state]
+    H --> D
+    F -->|No| I[Completion criteria met?]
+    I -->|No| D
+    I -->|Yes| J[Post-run: persist session, return result]
+```
+
+### Data flow (message/state)
+
+```mermaid
+flowchart TB
+    subgraph State["AgentState"]
+        Messages["messages[]"]
+        Meta["run metadata, iteration count"]
+    end
+
+    subgraph Context["Context assembly"]
+        System["system prompt"]
+        Memory["injected memory"]
+        History["session history"]
+    end
+
+    subgraph LLM["LLM round"]
+        Request["LLMRequest (messages + tools)"]
+        Response["LLMResponse (content + tool_calls)"]
+    end
+
+    subgraph Tools["Tool path"]
+        Call["ToolCall"]
+        Result["ToolResult"]
+    end
+
+    Context --> Messages
+    Messages --> Request
+    Response --> Call
+    Call --> Executor["ToolExecutor"]
+    Executor --> Result
+    Result --> Messages
+    Messages --> Meta
+```
+
+### Module layers (dependency direction)
+
+```mermaid
+flowchart TB
+    subgraph Entry["Entry"]
+        Index["src/index.ts"]
+    end
+
+    subgraph API["Public API layer"]
+        ApiAgent["core/agent"]
+        ApiTools["core/tools"]
+        ApiLLM["core/llm"]
+    end
+
+    subgraph Core["Core orchestration"]
+        CoreRuntime["Runtime"]
+        CoreLoops["core/loops"]
+        CoreState["core/state"]
+        CoreEvents["core/events"]
+        CoreSecurity["core/security"]
+        CoreExtensions["core/extensions"]
+    end
+
+    subgraph Support["Support modules"]
+        SupMemory["memory/"]
+        SupMiddleware["middleware/"]
+        SupMCP["mcp/"]
+        SupPersistence["persistence/"]
+        SupTesting["testing/"]
+    end
+
+    subgraph Models["Shared models"]
+        ModelsLayer["models/"]
+    end
+
+    Index --> ApiAgent
+    Index --> ApiTools
+    Index --> ApiLLM
+    Index --> Support
+    ApiAgent --> CoreRuntime
+    CoreRuntime --> CoreLoops
+    CoreRuntime --> CoreState
+    CoreRuntime --> CoreEvents
+    CoreLoops --> ApiLLM
+    CoreLoops --> ApiTools
+    CoreRuntime --> ModelsLayer
+    Support --> CoreRuntime
+    Support --> ModelsLayer
+```
 
 ## System Overview
 
