@@ -28,8 +28,9 @@
 19. [Phase 17: Testing Utilities](#phase-17)
 20. [Phase 18: Connectors, Credentials, Resilience](#phase-18)
 21. [Phase 19: Documentation & Publishing](#phase-19)
-22. [TypeScript-Specific Design Decisions](#typescript-decisions)
-23. [Dependency Mapping](#dependency-mapping)
+22. [Phase 20: Integration & E2E Testing Parity](#phase-20) ✅
+23. [TypeScript-Specific Design Decisions](#typescript-decisions)
+24. [Dependency Mapping](#dependency-mapping)
 
 ---
 
@@ -1648,6 +1649,139 @@ Create `curio-agent-sdk` — an npm package that is the TypeScript equivalent of
 
 ---
 
+<a id="phase-20"></a>
+## Phase 20: Integration & E2E Testing Parity ✅
+
+### Objective
+Close the gap between the Python SDK test pyramid and the TypeScript SDK by adding:
+- Full `tests/integration/` coverage for cross-component behavior
+- Full `tests/e2e/` coverage for user-facing workflows
+- Shared deterministic fixtures/factories under `tests/fixtures/`
+- CI-ready test partitioning (`unit`, `integration`, `e2e`, optional `live`)
+
+This phase mirrors the Python suite organization (`tests/integration`, `tests/e2e`, shared `conftest.py` fixtures) while adapting to Vitest/TypeScript idioms.
+
+### Python baseline to mirror
+Python currently includes:
+- Integration suite across agent+tools, agent+memory, state/sessions, hooks/events, middleware, permissions, skills/plugins, MCP, connectors, persistence, streaming, routing, cost budgets, and builder full-stack paths.
+- E2E suite across simple agent, tool agent, multi-turn sessions, coding agent (file read/write and code execution), multi-agent/subagent flows, memory-enabled agent, resilient/fallback behavior, and structured output.
+- Shared fixture factories in `tests/conftest.py` (messages, tool schemas/calls, response factories, event collectors).
+- Test markers (`unit`, `integration`, `e2e`, `slow`, `live`) declared in `pyproject.toml`.
+
+### 20.1 Test taxonomy and execution model
+- [x] Add test categories in TypeScript:
+  - `tests/unit/**/*.test.ts` (already present)
+  - `tests/integration/**/*.test.ts` (new)
+  - `tests/e2e/**/*.test.ts` (new)
+  - `tests/live/**/*.test.ts` (optional, gated by env)
+- [x] Update npm scripts:
+  - `test:unit` → `vitest run tests/unit`
+  - `test:integration` → `vitest run tests/integration`
+  - `test:e2e` → `vitest run tests/e2e`
+  - `test:live` → gated by required API keys/flags
+  - `test:all` → unit + integration + e2e
+- [x] Update Vitest config for stable non-flaky behavior:
+  - Dedicated include globs per category
+  - Slightly higher timeout for e2e/integration where needed
+  - Optional per-category projects if we want separate reporting
+
+### 20.2 Shared fixtures and deterministic test harnessing
+- [x] Create `tests/fixtures/` with reusable factories:
+  - `messages.ts` (system/user/assistant conversation factories)
+  - `llm-responses.ts` (text response, tool-call response, streamed chunk factories)
+  - `tools.ts` (standard fake tools: calculator/search/formatter/read/write/execute)
+  - `events.ts` (collector helpers for hook and event assertions)
+  - `memory.ts` (seed helpers for conversation/KV/composite memory)
+- [x] Add `tests/setup.ts` for global test setup/teardown (if needed) and register in Vitest config.
+- [x] Keep fixtures deterministic:
+  - Avoid wall-clock coupling unless explicitly testing timeouts
+  - No network in integration/e2e default suites
+  - Use `MockLLM`/`ReplayLLMClient` from Phase 17 for reproducible behavior
+
+### 20.3 Integration suite parity (`tests/integration/`)
+- [x] Add integration test modules aligned with Python coverage:
+  - `agent-with-tools.test.ts`
+  - `agent-with-memory.test.ts`
+  - `agent-with-sessions.test.ts`
+  - `agent-with-state.test.ts`
+  - `agent-with-hooks.test.ts`
+  - `agent-with-middleware.test.ts`
+  - `agent-with-permissions.test.ts`
+  - `agent-with-skills.test.ts`
+  - `agent-with-subagents.test.ts`
+  - `agent-with-structured.test.ts`
+  - `agent-streaming.test.ts`
+  - `agent-builder-full.test.ts`
+  - `mcp-integration.test.ts`
+  - `connector-integration.test.ts`
+  - `memory-persistence.test.ts`
+  - `event-bus-integration.test.ts`
+  - `llm-routing.test.ts`
+  - `cost-budget.test.ts`
+  - `middleware-pipeline.test.ts`
+  - `plugin-system.test.ts`
+- [x] For each integration file, enforce:
+  - At least one happy-path test
+  - At least one failure/recovery test
+  - Assertions on both output and internal behavior (events, tool calls, usage, state transitions)
+
+### 20.4 E2E suite parity (`tests/e2e/`)
+- [x] Add scenario-driven E2E modules aligned with Python:
+  - `simple-agent.test.ts`
+  - `tool-agent.test.ts`
+  - `multi-turn-agent.test.ts`
+  - `coding-agent.test.ts`
+  - `multi-agent.test.ts`
+  - `memory-agent.test.ts`
+  - `resilient-agent.test.ts`
+  - `structured-agent.test.ts`
+- [x] E2E design principles:
+  - Treat each test like a user workflow, not an implementation unit
+  - Validate final `AgentRunResult` contract (`status`, `output`, usage, iteration counts, error handling)
+  - Validate key side-effects (session messages saved, files written in temp dirs, memory carried across runs)
+  - Keep flows deterministic through `MockLLM` and explicit response queues
+
+### 20.5 Optional live/provider smoke tests
+- [x] Add a small `tests/live/` suite for provider sanity checks (OpenAI/Anthropic/etc.) behind environment gates:
+  - Run only when `RUN_LIVE_TESTS=true` and provider keys are set
+  - Keep smoke tests minimal (single prompt per provider)
+  - Exclude by default from CI required checks
+- [x] Document expected env vars and runtime cost caveats in `README.md`.
+
+### 20.6 CI/CD integration and quality gates
+- [x] Update CI workflow to run:
+  - Required: `typecheck`, `lint`, `test:unit`, `test:integration`, `test:e2e`
+  - Optional scheduled/manual: `test:live`, `test:coverage`
+- [x] Add coverage thresholds for integration-critical modules (agent loop, tool execution, middleware, memory, state, MCP).
+- [x] Publish artifacts for failed E2E runs (logs/snapshots/replays) to speed up debugging.
+
+### 20.7 Deliverables
+- [x] New directories and scaffolding:
+  - `tests/integration/`
+  - `tests/e2e/`
+  - `tests/fixtures/`
+  - `tests/setup.ts` (optional)
+- [x] Updated test scripts in `package.json`
+- [x] Updated `vitest.config.ts` to support category execution
+- [x] A parity checklist mapping each Python integration/E2E file to a TypeScript counterpart
+- [x] Contributor docs section: "How to write integration and E2E tests"
+
+### 20.8 Acceptance criteria
+- [x] Every Python integration domain has at least one corresponding TypeScript integration test module.
+- [x] Every Python E2E scenario class (simple, tools, multi-turn, coding, multi-agent, memory, resilience, structured output) has TypeScript coverage.
+- [x] `npm run test:integration` and `npm run test:e2e` pass consistently in CI.
+- [x] No default integration/E2E test depends on external network calls or secrets.
+- [x] Flaky test rate remains near zero across repeated CI runs.
+
+### 20.9 Suggested rollout order
+1. ~~Fixtures + test taxonomy + scripts~~
+2. ~~Core integration tests (agent/tools/memory/state/sessions/hooks/middleware)~~
+3. ~~Advanced integration tests (skills/subagents/MCP/connectors/persistence/routing)~~
+4. ~~E2E suites (simple → tool → multi-turn → memory → coding → multi-agent → resilience → structured)~~
+5. ~~CI hardening + optional live smoke tests~~
+
+---
+
 <a id="typescript-decisions"></a>
 ## TypeScript-Specific Design Decisions
 
@@ -1799,11 +1933,12 @@ class CurioError extends Error {
 | 17 | Testing Utilities | 2 weeks | P1 |
 | 18 | Connectors, Credentials, Resilience | 1 week | P2 |
 | 19 | Documentation & Publishing | 1-2 weeks | P1 |
+| 20 | Integration & E2E Testing Parity | 2-3 weeks | P1 |
 
-**Total estimated effort**: 22-32 weeks (5-8 months)
+**Total estimated effort**: 24-35 weeks (6-8 months)
 
 **P0 (Core — needed for coding tool)**: Phases 1-7 = ~9-11 weeks
-**P1 (Important)**: Phases 8-13, 17, 19 = ~9-13 weeks
+**P1 (Important)**: Phases 8-13, 17, 19, 20 = ~11-16 weeks
 **P2 (Nice-to-have)**: Phases 14-16, 18 = ~4-7 weeks
 
 The coding tool (Curio Code) can start building once P0 phases are complete and can use P1 features as they become available.
