@@ -16,12 +16,16 @@ import { OpenAIProvider } from "./openai.js";
 
 const SUPPORTED_MODELS = [
   "llama-3.1-8b-instant",
-  "llama-3.1-70b-versatile",
   "llama-3.3-70b-versatile",
   "llama-3.2-1b-preview",
   "llama-3.2-3b-preview",
   "llama-3.2-11b-vision-preview",
   "llama-3.2-90b-vision-preview",
+  "openai/gpt-oss-20b",
+  "meta-llama/llama-4-scout-17b-16e-instruct",
+  "meta-llama/llama-4-maverick-17b-128e-instruct",
+  "moonshotai/kimi-k2-instruct-0905",
+  "qwen/qwen3-32b",
   "mixtral-8x7b-32768",
   "gemma2-9b-it",
 ];

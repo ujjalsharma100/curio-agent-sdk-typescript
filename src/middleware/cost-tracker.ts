@@ -21,7 +21,11 @@ export const DEFAULT_PRICING: Record<string, { input: number; output: number }> 
   "claude-3-5-sonnet": { input: 3.0, output: 15.0 },
   "claude-3-haiku": { input: 0.25, output: 1.25 },
   "llama-3.1-8b-instant": { input: 0.05, output: 0.08 },
-  "llama-3.1-70b-versatile": { input: 0.59, output: 0.79 },
+  "llama-3.3-70b-versatile": { input: 0.59, output: 0.79 },
+  "openai/gpt-oss-20b": { input: 0.075, output: 0.3 },
+  "meta-llama/llama-4-scout-17b-16e-instruct": { input: 0.11, output: 0.34 },
+  "moonshotai/kimi-k2-instruct-0905": { input: 1.0, output: 3.0 },
+  "qwen/qwen3-32b": { input: 0.29, output: 0.59 },
 };
 
 export interface CostTrackerOptions {
@@ -96,7 +100,7 @@ export class CostTracker implements Middleware {
         if (this.onThreshold) {
           try {
             this.onThreshold(t, this.totalCost, this.budget);
-          } catch (_) {
+          } catch {
             // ignore
           }
         }

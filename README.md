@@ -198,7 +198,7 @@ Tools are registered once and then invoked by name from model tool calls:
 Model strings use `provider:model`:
 - `openai:gpt-4o-mini`
 - `anthropic:claude-sonnet-4-6`
-- `groq:llama-3.1-70b-versatile`
+- `groq:llama-3.3-70b-versatile`
 - `ollama:llama3.1`
 
 ### Provider credentials / environment variables
