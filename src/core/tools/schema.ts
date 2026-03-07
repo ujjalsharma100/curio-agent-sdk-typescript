@@ -31,6 +31,53 @@ export interface FromZodOptions {
   schemaName?: string;
 }
 
+function extractDefinitionRef(ref: string): string | undefined {
+  const match = /^#\/(?:definitions|\$defs)\/(.+)$/.exec(ref);
+  return match?.[1];
+}
+
+function sanitizeJsonSchema(schema: Record<string, unknown>): Record<string, unknown> {
+  const { $schema: _meta, definitions: _definitions, $defs: _defs, ...rest } = schema;
+  return rest;
+}
+
+/**
+ * zod-to-json-schema can return `{ $ref, definitions }` when a schema name is provided.
+ * OpenAI tools require `function.parameters` to be a direct JSON schema object.
+ */
+function toDirectParametersSchema(jsonSchema: Record<string, unknown>): Record<string, unknown> {
+  if ("type" in jsonSchema || "properties" in jsonSchema) {
+    return sanitizeJsonSchema(jsonSchema);
+  }
+
+  const ref = typeof jsonSchema["$ref"] === "string" ? jsonSchema["$ref"] : undefined;
+  const defName = ref ? extractDefinitionRef(ref) : undefined;
+  const definitions = jsonSchema["definitions"];
+  const defs = jsonSchema["$defs"];
+
+  if (
+    defName &&
+    definitions &&
+    typeof definitions === "object" &&
+    !Array.isArray(definitions) &&
+    defName in definitions
+  ) {
+    const definition = (definitions as Record<string, unknown>)[defName];
+    if (definition && typeof definition === "object" && !Array.isArray(definition)) {
+      return sanitizeJsonSchema(definition as Record<string, unknown>);
+    }
+  }
+
+  if (defName && defs && typeof defs === "object" && !Array.isArray(defs) && defName in defs) {
+    const definition = (defs as Record<string, unknown>)[defName];
+    if (definition && typeof definition === "object" && !Array.isArray(definition)) {
+      return sanitizeJsonSchema(definition as Record<string, unknown>);
+    }
+  }
+
+  return { type: "object", properties: jsonSchema ?? {} };
+}
+
 /**
  * Definition of a tool's parameter schema with validation and LLM conversion.
  * Use fromZod() to create from a Zod schema, or construct with raw parameters.
@@ -116,11 +163,11 @@ export function fromZod(
   zodSchema: z.ZodType<Record<string, unknown>>,
   options?: FromZodOptions,
 ): ToolSchemaDefinition {
-  const jsonSchema = zodToJsonSchema(zodSchema, options?.schemaName ?? name) as Record<string, unknown>;
-  const params =
-    jsonSchema && typeof jsonSchema === "object" && ("type" in jsonSchema || "properties" in jsonSchema)
-      ? jsonSchema
-      : { type: "object", properties: jsonSchema ?? {} };
+  const jsonSchema = zodToJsonSchema(
+    zodSchema,
+    options?.schemaName ? { name: options.schemaName } : undefined,
+  ) as Record<string, unknown>;
+  const params = toDirectParametersSchema(jsonSchema);
 
   const validator = (args: unknown) => {
     return zodSchema.parse(args) as Record<string, unknown>;

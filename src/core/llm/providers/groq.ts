@@ -2,7 +2,8 @@
  * Groq provider — uses OpenAI-compatible API for fast inference.
  *
  * Supports Llama, Mixtral, and other models hosted on Groq's LPU infrastructure.
- * Reuses the OpenAI SDK with a custom base URL.
+ * Reuses the OpenAI SDK with a custom base URL. Tool schema and tool-call parsing
+ * use the same logic as the OpenAI provider (direct JSON schema, safe JSON parse).
  */
 
 import type {
@@ -11,6 +12,7 @@ import type {
   LLMStreamChunk,
   ProviderConfig,
 } from "../../../models/llm.js";
+import { LLMError } from "../../../models/errors.js";
 import type { LLMProvider } from "./base.js";
 import { OpenAIProvider } from "./openai.js";
 
@@ -48,7 +50,14 @@ export class GroqProvider implements LLMProvider {
       baseUrl: config.baseUrl ?? GROQ_BASE_URL,
     };
 
-    return this.openaiProvider.call(request, groqConfig);
+    try {
+      return await this.openaiProvider.call(request, groqConfig);
+    } catch (err) {
+      if (err instanceof LLMError) {
+        throw new LLMError(err.message, { provider: "groq", model: (err as LLMError).model });
+      }
+      throw err;
+    }
   }
 
   async *stream(request: LLMRequest, config: ProviderConfig): AsyncIterableIterator<LLMStreamChunk> {
@@ -58,6 +67,13 @@ export class GroqProvider implements LLMProvider {
       baseUrl: config.baseUrl ?? GROQ_BASE_URL,
     };
 
-    yield* this.openaiProvider.stream(request, groqConfig);
+    try {
+      yield* this.openaiProvider.stream(request, groqConfig);
+    } catch (err) {
+      if (err instanceof LLMError) {
+        throw new LLMError(err.message, { provider: "groq", model: (err as LLMError).model });
+      }
+      throw err;
+    }
   }
 }

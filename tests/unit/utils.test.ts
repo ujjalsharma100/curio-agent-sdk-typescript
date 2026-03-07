@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import * as fs from "node:fs";
 import {
   sleep,
   withTimeout,
@@ -7,6 +8,8 @@ import {
   DedupCache,
   generateId,
   generateShortId,
+  createRunLogger,
+  useRunLogger,
 } from "../../src/utils/index.js";
 import { sha256, hashObject } from "../../src/utils/hash.js";
 
@@ -148,5 +151,59 @@ describe("ID generation", () => {
   it("generates unique IDs", () => {
     const ids = new Set(Array.from({ length: 100 }, () => generateId()));
     expect(ids.size).toBe(100);
+  });
+});
+
+describe("run-logger", () => {
+  it("createRunLogger with sink only has null getLogPath", () => {
+    const chunks: string[] = [];
+    const logger = createRunLogger({
+      sink: (chunk: string) => chunks.push(chunk),
+    });
+    expect(logger.getLogPath()).toBeNull();
+    logger.onRunBefore({ event: "agent.run.before", data: { input: "hi" } } as never);
+    expect(logger.getLogPath()).toBeNull();
+    expect(chunks.length).toBeGreaterThan(0);
+    expect(chunks[0]).toContain("AGENT RUN START");
+  });
+
+  it("createRunLogger with outputDir sets getLogPath on first write", () => {
+    const tmp = fs.mkdtempSync("run-logger-test-");
+    try {
+      const logger = createRunLogger({
+        outputDir: tmp,
+        baseName: "test-run",
+      });
+      expect(logger.getLogPath()).toBeNull();
+      logger.onRunBefore({ event: "agent.run.before", data: { input: "hi" } } as never);
+      const logPath = logger.getLogPath();
+      expect(logPath).toBeTruthy();
+      expect(logPath).toContain("test-run-");
+      expect(logPath).toMatch(/\.log$/);
+    } finally {
+      fs.rmSync(tmp, { recursive: true });
+    }
+  });
+
+  it("useRunLogger registers hooks and returns logger", () => {
+    const hooks: Array<{ event: string }> = [];
+    const builder = {
+      hook(event: string, _handler: () => void) {
+        hooks.push({ event });
+        return builder;
+      },
+    };
+    const logger = useRunLogger(builder as never, { sink: () => {} });
+    expect(logger.getLogPath()).toBeNull();
+    expect(hooks.map((h) => h.event)).toEqual(
+      expect.arrayContaining([
+        "agent.run.before",
+        "agent.run.after",
+        "llm.call.before",
+        "llm.call.after",
+        "tool.call.before",
+        "tool.call.after",
+      ]),
+    );
   });
 });

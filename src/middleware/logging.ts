@@ -1,5 +1,11 @@
 /**
- * Logging middleware — structured logging of all LLM and tool operations.
+ * Logging middleware — structured, summary-level logging of LLM and tool operations.
+ *
+ * Logs: model, message/tool counts, token usage, latency, tool name + args, and a
+ * short result preview (200 chars). Does not log full request messages, full
+ * response content, or full tool results. For full run dumps (every prompt/response
+ * and exact tool args/results) use hook-based logging to a file (e.g. the run-logger
+ * in examples/lib/run-logger.ts).
  *
  * Consider using LoggingConsumer (hook-based) for trace-id/span-id correlation
  * when OpenTelemetry is available.

@@ -318,6 +318,8 @@ Hooks and events let you react to lifecycle boundaries:
 - before/after/error for tool calls
 - state checkpoints and memory activity
 
+**Optional granular run logging (debug/audit):** Use `createRunLogger` and `useRunLogger` to write a full dump of each run to a file or custom sink (every LLM request/response, tool call args and results). Opt-in only; useful for debugging or support. See the tool-agent examples and `RunLoggerOptions` (including `sink`) for production use.
+
 ## Testing and Deterministic Development
 
 Recommended workflow:

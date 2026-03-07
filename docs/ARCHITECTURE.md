@@ -345,6 +345,20 @@ Tool execution supports:
 - middleware interception
 - permission policy checks
 
+### Tool validation and sanitization (production)
+
+**Schema and validation flow:**
+- **Definition:** Tools created with `createTool({ parameters: z.object(...) })` use Zod as the single source of truth. `fromZod()` converts the schema to JSON Schema for the LLM and keeps a Zod validator for runtime.
+- **LLM payload:** Parameter schema sent to providers is a direct JSON object (no top-level `$ref`/`definitions`), so OpenAI and others accept it.
+- **Parsing:** Provider responses (e.g. `function.arguments` string) are parsed as JSON. Invalid JSON in non-streaming OpenAI responses throws a clear `LLMError`; streaming path falls back to `{ raw: ... }` and validation then fails at execute.
+- **Execution:** Every `tool.execute(args)` runs the tool’s validator first (Zod `parse`). Invalid or missing fields throw `ToolValidationError`, which the executor turns into a `ToolResult` with an error message (no crash).
+
+**Production recommendations:**
+- Use **Zod `.strict()`** on parameter schemas if you want to reject unknown keys (e.g. `z.object({ ... }).strict()`).
+- Avoid **eval/Function** or other unsafe execution in tool implementations; validate and constrain inputs (e.g. allowlist operations, max length, sanitize for your backend).
+- Rely on **permission policy** and **human-in-the-loop** for sensitive tools (file/network/destructive actions).
+- Rely on **timeout** and **retry** in `ToolConfig` for robustness; use **cacheTtl** / **idempotent** only when the tool is safe to cache/replay.
+
 ## LLM Architecture and Resilience
 
 `LLMClient` provides provider-agnostic model invocation.

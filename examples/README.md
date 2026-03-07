@@ -72,10 +72,27 @@ What it demonstrates:
 - custom tool definition with `createTool(...)`
 - schema-validated tool arguments via Zod
 - loop behavior where model calls tools before final answer
+- **full run logging** — writes a timestamped `.log` file with every LLM request/response, tool call (name + exact args), and result
 
 When to use:
 - integrating internal APIs/utilities as tools
 - validating tool call observability and result formatting
+- inspecting exactly what the agent sent and received (prompts, tool calls, arguments)
+
+### Tool agents by provider
+
+Each logs the full run to a `.log` file (e.g. `tool-agent-openai-2025-03-07T12-30-45.log`):
+
+- **`tool-agent-openai.ts`** — OpenAI (e.g. `gpt-4o-mini`). Requires `OPENAI_API_KEY`.
+- **`tool-agent-groq.ts`** — Groq (e.g. `llama-3.3-70b-versatile`). Requires `GROQ_API_KEY`.
+- **`tool-agent-anthropic.ts`** — Anthropic (e.g. `claude-3-5-haiku`). Requires `ANTHROPIC_API_KEY`.
+- **`tool-agent-ollama.ts`** — Ollama (e.g. `llama3.2`). Requires Ollama running locally (`ollama pull llama3.2`). Set `OLLAMA_HOST` if not at `http://localhost:11434`.
+
+Run any of them; after the run, open the printed log path to see:
+- each LLM request (messages, model, tools)
+- each LLM response (content, tool calls with arguments, usage)
+- each tool call start (tool name, exact arguments)
+- each tool call end (result, duration)
 
 ### `memory-agent.ts`
 
@@ -111,9 +128,15 @@ Other examples:
 
 ```bash
 npx tsx examples/tool-agent.ts
+npx tsx examples/tool-agent-openai.ts
+npx tsx examples/tool-agent-groq.ts
+npx tsx examples/tool-agent-anthropic.ts
+npx tsx examples/tool-agent-ollama.ts
 npx tsx examples/memory-agent.ts
 npx tsx examples/streaming-agent.ts
 ```
+
+Tool examples write a **run log** to a timestamped file (e.g. `tool-agent-openai-2025-03-07T12-30-45.log`) in the current working directory. The path is printed at the end of the run.
 
 ## Suggested Learning Path
 

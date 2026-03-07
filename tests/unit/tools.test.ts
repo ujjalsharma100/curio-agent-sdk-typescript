@@ -39,6 +39,23 @@ describe("ToolSchemaDefinition / fromZod", () => {
     expect(validated.limit).toBe(10);
   });
 
+  it("fromZod emits direct object schema (no top-level $ref/definitions)", () => {
+    const def = fromZod(
+      "calculator",
+      "Evaluate arithmetic",
+      z.object({
+        expression: z.string().describe("Expression like 12 * 7"),
+      }),
+    );
+
+    const json = def.toJsonSchema();
+    expect(json.type).toBe("object");
+    expect(json.properties).toBeDefined();
+    expect(json.$ref).toBeUndefined();
+    expect(json.definitions).toBeUndefined();
+    expect(json.$defs).toBeUndefined();
+  });
+
   it("validate throws ToolValidationError on invalid input", () => {
     const schema = z.object({ name: z.string() });
     const def = fromZod("greet", "Greet", schema);

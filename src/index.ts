@@ -360,7 +360,10 @@ export {
   generateId,
   generateShortId,
   createLogger,
+  createRunLogger,
+  useRunLogger,
 } from "./utils/index.js";
+export type { RunLogger, RunLoggerOptions } from "./utils/index.js";
 
 // ── Built-in Tools ────────────────────────────────────────────────────────────
 export {

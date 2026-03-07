@@ -84,13 +84,27 @@ function toOpenAITools(tools: ToolSchema[]): unknown[] {
   }));
 }
 
-/** Parse OpenAI tool calls from response. */
+/** Parse OpenAI tool calls from response. Safe: invalid JSON throws LLMError with details. */
 function parseToolCalls(rawCalls: Array<{ id: string; function: { name: string; arguments: string } }>): ToolCall[] {
-  return rawCalls.map((tc) => ({
-    id: tc.id,
-    name: tc.function.name,
-    arguments: JSON.parse(tc.function.arguments) as Record<string, unknown>,
-  }));
+  const out: ToolCall[] = [];
+  for (const tc of rawCalls) {
+    let args: Record<string, unknown>;
+    const raw = tc.function.arguments;
+    try {
+      args = (raw ? JSON.parse(raw) : {}) as Record<string, unknown>;
+      if (args === null || typeof args !== "object" || Array.isArray(args)) {
+        args = {};
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new LLMError(
+        `Invalid tool call arguments (JSON parse failed) for tool "${tc.function.name}": ${msg}. Raw: ${String(raw).slice(0, 200)}`,
+        { provider: "openai" },
+      );
+    }
+    out.push({ id: tc.id, name: tc.function.name, arguments: args });
+  }
+  return out;
 }
 
 /** Map OpenAI error to SDK error. */
