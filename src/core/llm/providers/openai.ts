@@ -124,10 +124,11 @@ function mapError(err: unknown): never {
     if (status === 408 || status === 504) throw new LLMTimeoutError(message, { provider: "openai" });
     if (status >= 500) throw new LLMProviderError(message, { provider: "openai", statusCode: status });
 
-    // 400/422 with "Failed to call a function" / "failed_generation" = model produced invalid tool call (common with Groq)
-    if ((status === 400 || status === 422) && /failed_generation|Failed to call a function|adjust your prompt/i.test(message)) {
+    // 400/422 with "Failed to call a function" / "failed_generation" / "attempted to call tool" = model produced invalid tool call (common with Groq)
+    if ((status === 400 || status === 422) && /failed_generation|Failed to call a function|adjust your prompt|attempted to call tool/i.test(message)) {
       message =
-        "The model produced an invalid tool call. Try again with a shorter or simpler request, or use a different model (e.g. --model sonnet). " +
+        "The model produced an invalid tool call. This often happens with models that struggle with many/complex tool schemas. " +
+        "Try again, simplify the request, or use a different model (e.g. --model sonnet). " +
         message;
     }
     throw new LLMError(message, { provider: "openai" });
@@ -260,7 +261,7 @@ export class OpenAIProvider implements LLMProvider {
               toolCall: {
                 id: buf.id,
                 name: buf.name || undefined,
-                arguments: undefined,
+                arguments: tc.function?.arguments,
               },
             };
           }

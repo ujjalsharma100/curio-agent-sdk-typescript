@@ -127,9 +127,16 @@ export interface LLMResponse {
 // ---------------------------------------------------------------------------
 
 /** A single chunk in a streaming LLM response. */
+/** Tool call info within a streaming chunk. arguments can be a partial JSON string fragment. */
+export interface StreamToolCall {
+  id: string;
+  name?: string;
+  arguments?: string | Record<string, unknown>;
+}
+
 export type LLMStreamChunk =
   | { type: "text_delta"; text: string }
-  | { type: "tool_call_delta"; toolCall: Partial<ToolCall> & { id: string } }
+  | { type: "tool_call_delta"; toolCall: StreamToolCall }
   | { type: "thinking_delta"; text: string }
   | { type: "usage"; usage: Partial<TokenUsage> }
   | { type: "done"; finishReason: FinishReason };

@@ -242,7 +242,7 @@ export class AnthropicProvider implements LLMProvider {
             toolArgsBuffer += event.delta.partial_json;
             yield {
               type: "tool_call_delta",
-              toolCall: { id: currentToolId, name: currentToolName },
+              toolCall: { id: currentToolId, name: currentToolName, arguments: event.delta.partial_json },
             };
           } else if (event.delta.type === "thinking_delta" && event.delta.thinking) {
             yield { type: "thinking_delta", text: event.delta.thinking };
