@@ -307,6 +307,7 @@ export class ToolCallingLoop implements AgentLoop {
     const toolCallBuffers = new Map<string, { id: string; name: string; args: string }>();
     const toolCallOrder: string[] = [];
     let usageFromStream: { promptTokens?: number; completionTokens?: number; totalTokens?: number } = {};
+    const llmStart = Date.now();
 
     try {
       for await (const chunk of this.llmClient.stream(request)) {
@@ -369,6 +370,22 @@ export class ToolCallingLoop implements AgentLoop {
       }
       assembledToolCalls.push({ id: buf.id, name: buf.name || "unknown", arguments: args });
     }
+
+    const llmDuration = Date.now() - llmStart;
+    const response = {
+      content: fullText,
+      toolCalls: assembledToolCalls,
+      usage: usageFromStream,
+    };
+    await this.hooks.emit(
+      HookEvent.LLM_CALL_AFTER,
+      new HookContext({
+        event: HookEvent.LLM_CALL_AFTER,
+        data: { request, response, duration: llmDuration },
+        runId: state.runId,
+        iteration: state.iteration,
+      }),
+    );
 
     if (usageFromStream.promptTokens !== undefined || usageFromStream.completionTokens !== undefined) {
       state.addUsage({
