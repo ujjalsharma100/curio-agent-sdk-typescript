@@ -28,6 +28,7 @@ The SDK is designed for real agent workloads, not just demo wrappers:
 - [Advanced Topics](#advanced-topics)
 - [Docs and References](#docs-and-references)
 - [Development Workflow](#development-workflow)
+- [Publishing to npm](#publishing-to-npm)
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
 
@@ -673,6 +674,7 @@ console.log(result.output);
 
 ## Docs and References
 
+- Publishing the package to npm: `PUBLISHING.md`
 - API reference generation and maintenance: `docs/API_REFERENCE.md`
 - Python migration guide: `docs/MIGRATION_FROM_PYTHON.md`
 - Runtime architecture deep dive: `docs/ARCHITECTURE.md`
@@ -694,6 +696,12 @@ Before publishing:
 - confirm tests pass by category
 - verify exported surface in `src/index.ts`
 - verify package files list includes docs/readme/license as intended
+
+See **`PUBLISHING.md`** for npm login, version bumps, dry runs, CI tokens, and troubleshooting.
+
+## Publishing to npm
+
+The package name on npm is **`curio-agent-sdk`**. Full steps, checklists, and automation notes are in [`PUBLISHING.md`](./PUBLISHING.md). In short: run tests and docs as needed, bump the version (`npm version patch` or similar), then from this directory run `npm publish` (after `npm login` if required).
 
 ## Troubleshooting
 
