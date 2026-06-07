@@ -289,11 +289,13 @@ Common stream events:
 
 ## Sessions and Multi-turn Conversations
 
-For continuity across turns, configure a `SessionManager` and pass `sessionId`:
+For continuity across turns, configure a `SessionManager` and pass `sessionId` to **`agent.arun`**:
 - previous messages are loaded before each run
 - new run messages are persisted back to the session store
 
 This is the preferred approach for chatbot-style UX where each user has ongoing context.
+
+For **long-running autonomous agents**, combine sessions with **run checkpoints** (`StateStore` / `FileStateStore`, `checkpointFromState`) and, when you intentionally reset model context, **fresh runs** with a slim `initialMessages` set plus handoff artifacts your app owns. The SDK does not auto-reset context based on token counts. See `docs/ARCHITECTURE.md` → *State, Sessions, and Persistence* → *Three-tier continuity model*.
 
 ## Memory
 
@@ -346,7 +348,7 @@ At a high level:
 
 1. `Agent.builder()` collects configuration (model, tools, hooks, memory, sessions, middleware, permissions, etc.).
 2. `.build()` materializes collaborators like `ToolRegistry`, `ToolExecutor`, `HookRegistry`, `MemoryManager`, `StateStore`, and a `Runtime` using a `ToolCallingLoop`.
-3. `agent.run(...)` / `agent.astream(...)` create an `AgentState`, optionally load session history, inject memory, call the LLM, execute tools, and iterate until completion.
+3. `agent.run(...)` / `agent.arun(...)` create an `AgentState`, optionally load session history when `sessionId` is set, inject memory, call the LLM, execute tools, and iterate until completion. `agent.astream(...)` does not perform the same automatic session merge; pass `initialMessages` explicitly if needed.
 4. The final `AgentRunResult` includes output text, tool calls, token usage, metrics, and run metadata.
 
 For a much deeper breakdown, see `docs/ARCHITECTURE.md`.

@@ -3,6 +3,9 @@
  *
  * Serializes AgentState to JSON for persistence and resumption after
  * crashes or interruptions. Version-tagged for migration support.
+ *
+ * This is tier 2 of the long-run continuity model (single-run resume); see
+ * docs/ARCHITECTURE.md — "Three-tier continuity model".
  */
 
 import type { Message, ToolSchema, TokenUsage, ContentPart, ToolCall } from "../../models/llm.js";

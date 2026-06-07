@@ -143,6 +143,8 @@ export class Agent {
   async arun(input: string, options?: RunOptions): Promise<AgentRunResult> {
     this.ensureNotClosed();
     let runOptions = options;
+    // Tier 1 (session-backed chat): merge persisted history for multi-turn UX.
+    // See docs/ARCHITECTURE.md — three-tier continuity model.
     if (options?.sessionId && this._sessionManager) {
       const history = await this._sessionManager.getMessages(options.sessionId);
       runOptions = { ...options, initialMessages: history };

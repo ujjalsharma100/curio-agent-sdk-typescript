@@ -74,6 +74,9 @@ export class InMemoryStateStore implements StateStore {
 /**
  * File-based state store.
  * Saves state as JSON files in a directory; each run is one file (overwritten on save).
+ *
+ * Typical tier-2 (checkpoint) backend for crash-safe run resumption; hosts may use
+ * other `StateStore` implementations. See docs/ARCHITECTURE.md — continuity model.
  */
 export class FileStateStore implements StateStore {
   private readonly dir: string;

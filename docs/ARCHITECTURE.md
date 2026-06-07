@@ -295,6 +295,26 @@ For `agent.astream(...)`, the same lifecycle applies but emits incremental `Stre
 
 ## State, Sessions, and Persistence
 
+### Three-tier continuity model (long-running and autonomous agents)
+
+Long-horizon and autonomous coding workloads combine three **separate** mechanisms. The SDK exposes primitives for each tier; **whether** to compact transcripts, reset context, or start a clean run is **not** decided inside core `Runtime` (that stays model-agnostic and avoids surprising short-run users). Host apps, harnesses, or middleware own those policies.
+
+| Tier | Goal | Typical SDK pieces |
+|------|------|-------------------|
+| **1. Session history** | Multi-turn **user** continuity across many runs | `SessionManager` + `sessionId` on `Agent.arun` (loads history into `initialMessages`, persists new messages after the run) |
+| **2. Run checkpoints** | **Crash-safe resumption** of one interrupted run | `checkpointFromState` / `stateFromCheckpoint`, `serializeCheckpoint`, `StateStore` implementations such as `FileStateStore` or `InMemoryStateStore` |
+| **3. Fresh-run handoffs** | New model context when drift or context limits dominate | New `Agent` / new run with a **small** `initialMessages` slice plus **application-authored** handoff artifacts (specs, contracts, logs, tool metadata) persisted **outside** `AgentState` however the product prefers |
+
+**Tier 1 details:** Session merge and persistence are wired on `Agent.arun` when `sessionId` is set. `Agent.astream` does not apply the same automatic session load/save path today; for streaming with sessions, supply merged `initialMessages` (and persist deltas in app code if needed), or use `arun` for turnkey session behavior.
+
+**Tier 2 details:** Checkpoints include messages, tool schemas, usage/metrics, extension blobs, and other fields needed to reconstruct `AgentState`. Stores remain **swappable** (files, memory, or custom DB-backed adapters)—nothing here assumes PostgreSQL-only deployments.
+
+**Tier 3 details:** Handoff **quality and schema** are integrator responsibilities. The SDK does not prescribe directory layout, file formats, or mandatory handoff templates; avoid treating `SessionManager` alone as a substitute for deliberate cross-run contracts when you orchestrate intentional resets.
+
+**Out of scope for core (by design):** automatic token-threshold resets inside `Runtime`, built-in multi-phase harness runtimes, or mandated handoff file trees. Compaction rules, budgets, and model-specific “context anxiety” responses belong in the LLM client, middleware, or orchestration layer.
+
+Further reading on resets vs compaction and structured carryover across sessions: [Anthropic Engineering — Harness design for long-running application development](https://www.anthropic.com/engineering/harness-design-long-running-apps) (Mar 2026).
+
 ### State
 
 `AgentState` tracks:
@@ -302,11 +322,11 @@ For `agent.astream(...)`, the same lifecycle applies but emits incremental `Stre
 - iteration counters and internal run metadata
 - transient data needed by loop/runtime mechanics
 
-Checkpoint helpers provide serialization/deserialization for pause/resume workflows.
+Checkpoint helpers provide serialization/deserialization for pause/resume workflows (tier 2 above).
 
 ### Sessions
 
-`SessionManager` enables multi-turn continuity:
+`SessionManager` enables multi-turn continuity (tier 1):
 - before run: load prior messages by `sessionId`
 - after run: append new messages generated during this run
 
